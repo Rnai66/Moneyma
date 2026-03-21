@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Statistics - The Financial Architect</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "on-surface": "#dae2fd",
+              "background": "#0b1326",
+              "on-primary-container": "#cacfff",
+              "on-primary": "#08218a",
+              "on-tertiary-fixed-variant": "#005236",
+              "on-error-container": "#ffdad6",
+              "surface-tint": "#bac3ff",
+              "secondary-fixed-dim": "#d0bcff",
+              "inverse-on-surface": "#283044",
+              "tertiary-fixed-dim": "#4edea3",
+              "on-secondary-fixed-variant": "#5516be",
+              "on-background": "#dae2fd",
+              "surface-container-lowest": "#060e20",
+              "error": "#ffb4ab",
+              "surface-container-low": "#131b2e",
+              "primary": "#bac3ff",
+              "secondary": "#d0bcff",
+              "on-tertiary-container": "#5debaf",
+              "on-tertiary": "#003824",
+              "inverse-surface": "#dae2fd",
+              "secondary-container": "#571bc1",
+              "on-secondary-fixed": "#23005c",
+              "surface-container-high": "#222a3d",
+              "surface-container-highest": "#2d3449",
+              "tertiary-container": "#006846",
+              "on-primary-fixed": "#00105c",
+              "primary-fixed-dim": "#bac3ff",
+              "surface-container": "#171f33",
+              "on-error": "#690005",
+              "outline": "#8f909e",
+              "surface-variant": "#2d3449",
+              "on-secondary": "#3c0091",
+              "outline-variant": "#454652",
+              "primary-container": "#3f51b5",
+              "on-surface-variant": "#c5c5d4",
+              "on-tertiary-fixed": "#002113",
+              "inverse-primary": "#4355b9",
+              "surface-dim": "#0b1326",
+              "tertiary-fixed": "#6ffbbe",
+              "secondary-fixed": "#e9ddff",
+              "on-primary-fixed-variant": "#293ca0",
+              "tertiary": "#4edea3",
+              "error-container": "#93000a",
+              "surface": "#0b1326",
+              "on-secondary-container": "#c4abff",
+              "surface-bright": "#31394d",
+              "primary-fixed": "#dee0ff"
+            },
+            fontFamily: {
+              "headline": ["Manrope"],
+              "body": ["Inter"],
+              "label": ["Inter"]
+            },
+            borderRadius: {"DEFAULT": "0.25rem", "lg": "1rem", "xl": "1.5rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+      .material-symbols-outlined {
+        font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      }
+      .glass-card {
+        background: rgba(23, 31, 51, 0.6);
+        backdrop-filter: blur(20px);
+      }
+      .no-scrollbar::-webkit-scrollbar { display: none; }
+      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-surface font-body min-h-screen pb-32">
+<!-- Top App Bar (Shared Component Strategy) -->
+<header class="fixed top-0 left-0 right-0 z-50 bg-[#0b1326]/60 backdrop-blur-2xl px-6 py-4 flex justify-between items-center w-full bg-gradient-to-b from-[#0b1326] to-transparent">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-primary-container flex items-center justify-center">
+<img alt="Profile" class="w-full h-full object-cover rounded-full" data-alt="Close up portrait of a male user" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAcrxQQBFYjIR91KyA1ELYyZKGtBIXLHE7UX5SfTqPpWZPvMI0vvKuWEzMm-DWiqOjZbbaxeeMMdwcKi22ubONITQmH6pFEWQhy5104g00Fdaw6jS9tUm3CCH8wwmiKdhP9Xq3sqxmIfP5g8k_sDi5yMYg64vj4nTdRBWpFRahmNIzAQcUsPRxp_LwJPTgRNOJJAbb7br05BDVq-5CQnuxjJqlPRnuKgJNN-XQngu4NA7Us018uj2SEEVgzm2r7DAof_8a1x_sxVAc"/>
+</div>
+<h1 class="text-xl font-black text-[#bac3ff] tracking-tighter font-headline">The Financial Architect</h1>
+</div>
+<button class="text-[#bac3ff] hover:opacity-80 transition-opacity">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+</header>
+<main class="pt-24 px-6 max-w-lg mx-auto space-y-10">
+<!-- Page Title -->
+<section>
+<span class="font-label text-[10px] uppercase tracking-[0.15em] text-on-surface-variant font-semibold">Performance Analytics</span>
+<h2 class="text-4xl font-extrabold font-headline tracking-tight mt-1">Stats</h2>
+</section>
+<!-- Bento Grid Layout for Charts -->
+<div class="grid grid-cols-1 gap-6">
+<!-- Monthly Trend: Smooth Line Chart -->
+<div class="surface-container-low rounded-xl p-6 flex flex-col gap-4 relative overflow-hidden group">
+<div class="flex justify-between items-start">
+<div>
+<p class="text-label-sm font-semibold uppercase tracking-wider text-on-surface-variant text-[10px]">Monthly Trend</p>
+<p class="text-2xl font-bold font-headline mt-1 text-primary">+$4,230.15</p>
+</div>
+<div class="bg-tertiary-container/20 text-tertiary px-2 py-1 rounded text-xs font-bold">+12.4%</div>
+</div>
+<!-- SVG Line Chart Representation -->
+<div class="h-32 w-full mt-2 relative">
+<svg class="w-full h-full" viewbox="0 0 400 100">
+<defs>
+<lineargradient id="lineGradient" x1="0" x2="0" y1="0" y2="1">
+<stop offset="0%" stop-color="#bac3ff" stop-opacity="0.3"></stop>
+<stop offset="100%" stop-color="#bac3ff" stop-opacity="0"></stop>
+</lineargradient>
+</defs>
+<path d="M0,80 C50,75 80,40 120,45 C160,50 200,20 250,25 C300,30 350,10 400,5" fill="none" stroke="#bac3ff" stroke-linecap="round" stroke-width="3"></path>
+<path d="M0,80 C50,75 80,40 120,45 C160,50 200,20 250,25 C300,30 350,10 400,5 V100 H0 Z" fill="url(#lineGradient)"></path>
+<!-- Tooltip Pointer -->
+<circle class="animate-pulse" cx="250" cy="25" fill="#bac3ff" r="5"></circle>
+</svg>
+</div>
+<div class="flex justify-between text-[10px] font-bold text-on-surface-variant uppercase tracking-widest mt-2">
+<span>Jan</span>
+<span>Mar</span>
+<span>May</span>
+<span>Jul</span>
+<span>Sep</span>
+<span>Nov</span>
+</div>
+</div>
+<!-- Two Column Stats: Income vs Expense -->
+<div class="grid grid-cols-2 gap-4">
+<div class="surface-container-low rounded-xl p-5 flex flex-col justify-between">
+<div>
+<span class="material-symbols-outlined text-tertiary text-xl" data-icon="arrow_downward">arrow_downward</span>
+<p class="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant mt-2">Income</p>
+<p class="text-xl font-bold font-headline text-tertiary">$12,850</p>
+</div>
+<!-- Mini Bar Chart -->
+<div class="flex items-end gap-1 h-8 mt-4">
+<div class="w-full bg-tertiary/20 rounded-t-sm h-1/2"></div>
+<div class="w-full bg-tertiary/20 rounded-t-sm h-3/4"></div>
+<div class="w-full bg-tertiary rounded-t-sm h-full"></div>
+</div>
+</div>
+<div class="surface-container-low rounded-xl p-5 flex flex-col justify-between">
+<div>
+<span class="material-symbols-outlined text-error text-xl" data-icon="arrow_upward">arrow_upward</span>
+<p class="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant mt-2">Expense</p>
+<p class="text-xl font-bold font-headline text-error">$8,620</p>
+</div>
+<!-- Mini Bar Chart -->
+<div class="flex items-end gap-1 h-8 mt-4">
+<div class="w-full bg-error/20 rounded-t-sm h-3/4"></div>
+<div class="w-full bg-error rounded-t-sm h-1/2"></div>
+<div class="w-full bg-error/40 rounded-t-sm h-4/5"></div>
+</div>
+</div>
+</div>
+<!-- Expenses by Category: Donut Chart -->
+<div class="surface-container rounded-xl p-6">
+<p class="text-label-sm font-semibold uppercase tracking-wider text-on-surface-variant text-[10px] mb-6">Expenses by Category</p>
+<div class="flex items-center gap-8">
+<div class="relative w-32 h-32 flex-shrink-0">
+<!-- Donut Chart SVG -->
+<svg class="transform -rotate-90 w-full h-full" viewbox="0 0 100 100">
+<circle cx="50" cy="50" fill="none" r="40" stroke="#131b2e" stroke-width="12"></circle>
+<circle cx="50" cy="50" fill="none" r="40" stroke="#bac3ff" stroke-dasharray="100 251.2" stroke-dashoffset="0" stroke-width="12"></circle>
+<circle cx="50" cy="50" fill="none" r="40" stroke="#d0bcff" stroke-dasharray="60 251.2" stroke-dashoffset="-100" stroke-width="12"></circle>
+<circle cx="50" cy="50" fill="none" r="40" stroke="#4edea3" stroke-dasharray="40 251.2" stroke-dashoffset="-160" stroke-width="12"></circle>
+</svg>
+<div class="absolute inset-0 flex flex-col items-center justify-center">
+<span class="text-[10px] font-bold text-on-surface-variant uppercase">Total</span>
+<span class="text-lg font-bold text-white">$8.6k</span>
+</div>
+</div>
+<div class="space-y-3 flex-grow">
+<div class="flex items-center justify-between text-xs">
+<div class="flex items-center gap-2">
+<div class="w-2 h-2 rounded-full bg-primary"></div>
+<span class="text-on-surface-variant">Housing</span>
+</div>
+<span class="font-bold">42%</span>
+</div>
+<div class="flex items-center justify-between text-xs">
+<div class="flex items-center gap-2">
+<div class="w-2 h-2 rounded-full bg-secondary"></div>
+<span class="text-on-surface-variant">Lifestyle</span>
+</div>
+<span class="font-bold">28%</span>
+</div>
+<div class="flex items-center justify-between text-xs">
+<div class="flex items-center gap-2">
+<div class="w-2 h-2 rounded-full bg-tertiary"></div>
+<span class="text-on-surface-variant">Invest</span>
+</div>
+<span class="font-bold">20%</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Summary Table (Category Breakdown) -->
+<section class="space-y-4">
+<h3 class="text-sm font-bold uppercase tracking-widest text-on-surface-variant pl-1">Detailed Breakdown</h3>
+<div class="surface-container-low rounded-xl overflow-hidden">
+<div class="flex items-center justify-between p-4 border-b border-outline-variant/10 bg-surface-container-high/30">
+<span class="text-[10px] font-bold text-on-surface-variant uppercase">Category</span>
+<span class="text-[10px] font-bold text-on-surface-variant uppercase">Net Value</span>
+</div>
+<!-- Category Rows -->
+<div class="divide-y divide-outline-variant/10">
+<div class="flex items-center justify-between p-5 hover:bg-surface-container transition-colors">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined" data-icon="home">home</span>
+</div>
+<div>
+<p class="font-bold text-sm">Real Estate</p>
+<p class="text-[10px] text-on-surface-variant uppercase font-semibold">4 Transactions</p>
+</div>
+</div>
+<p class="font-bold text-error">-$2,400.00</p>
+</div>
+<div class="flex items-center justify-between p-5 hover:bg-surface-container transition-colors">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-xl bg-tertiary/10 flex items-center justify-center text-tertiary">
+<span class="material-symbols-outlined" data-icon="work">work</span>
+</div>
+<div>
+<p class="font-bold text-sm">Dividends</p>
+<p class="text-[10px] text-on-surface-variant uppercase font-semibold">1 Transaction</p>
+</div>
+</div>
+<p class="font-bold text-tertiary">+$1,120.50</p>
+</div>
+<div class="flex items-center justify-between p-5 hover:bg-surface-container transition-colors">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-xl bg-secondary/10 flex items-center justify-center text-secondary">
+<span class="material-symbols-outlined" data-icon="shopping_bag">shopping_bag</span>
+</div>
+<div>
+<p class="font-bold text-sm">Subscription</p>
+<p class="text-[10px] text-on-surface-variant uppercase font-semibold">12 Transactions</p>
+</div>
+</div>
+<p class="font-bold text-error">-$149.99</p>
+</div>
+</div>
+</div>
+</section>
+<!-- Empty State (Conditional Section Simulation) -->
+<section class="hidden opacity-50 text-center py-20 border-2 border-dashed border-outline-variant/20 rounded-xl">
+<span class="material-symbols-outlined text-4xl text-on-surface-variant mb-4" data-icon="analytics">analytics</span>
+<p class="text-sm font-bold text-on-surface-variant uppercase">No historical data found</p>
+<p class="text-xs text-outline mt-1">Start tracking to see your growth architected here.</p>
+</section>
+</main>
+<!-- Bottom Navigation Bar (Shared Component Strategy) -->
+<nav class="fixed bottom-0 left-0 w-full flex justify-around items-center px-4 pb-6 pt-3 bg-[#0b1326]/80 backdrop-blur-3xl z-50 rounded-t-[1.5rem] shadow-2xl shadow-indigo-950/50 ring-1 ring-[#bac3ff]/5">
+<div class="flex flex-col items-center justify-center text-[#dae2fd]/40 px-4 py-2 transition-colors hover:text-[#bac3ff]">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span class="font-['Inter'] text-[10px] uppercase tracking-[0.05em] font-semibold mt-1">Dashboard</span>
+</div>
+<div class="flex flex-col items-center justify-center text-[#dae2fd]/40 px-4 py-2 transition-colors hover:text-[#bac3ff]">
+<span class="material-symbols-outlined" data-icon="receipt_long">receipt_long</span>
+<span class="font-['Inter'] text-[10px] uppercase tracking-[0.05em] font-semibold mt-1">Activity</span>
+</div>
+<div class="flex flex-col items-center justify-center bg-[#171f33] text-[#bac3ff] rounded-2xl px-4 py-2 ring-1 ring-[#bac3ff]/10 scale-95 duration-200">
+<span class="material-symbols-outlined" data-icon="insert_chart" style="font-variation-settings: 'FILL' 1;">insert_chart</span>
+<span class="font-['Inter'] text-[10px] uppercase tracking-[0.05em] font-semibold mt-1">Stats</span>
+</div>
+<div class="flex flex-col items-center justify-center text-[#dae2fd]/40 px-4 py-2 transition-colors hover:text-[#bac3ff]">
+<span class="material-symbols-outlined" data-icon="analytics">analytics</span>
+<span class="font-['Inter'] text-[10px] uppercase tracking-[0.05em] font-semibold mt-1">Reports</span>
+</div>
+<div class="flex flex-col items-center justify-center text-[#dae2fd]/40 px-4 py-2 transition-colors hover:text-[#bac3ff]">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span class="font-['Inter'] text-[10px] uppercase tracking-[0.05em] font-semibold mt-1">Settings</span>
+</div>
+</nav>
+</body></html>
