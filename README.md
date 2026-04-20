@@ -1,190 +1,286 @@
-# Personal Finance Manager 💰
+# MoneyMa 💰 — Personal Finance Manager
 
-A modern desktop application for managing your personal finances built with Electron, React, and SQLite.
+> จัดการการเงินส่วนตัวอย่างชาญฉลาด บน Desktop, iOS และ Android
 
-## Features ✨
+[![Version](https://img.shields.io/badge/version-1.4.0-blue.svg)](package.json)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Platform](https://img.shields.io/badge/platform-Web%20%7C%20Desktop%20%7C%20iOS%20%7C%20Android-lightgrey.svg)](capacitor.config.ts)
 
-- 📊 **Dashboard** - Overview of your financial summary
-- 💰 **Transaction Management** - Add, edit, delete income and expenses
-- 🔍 **Search & Filter** - Find transactions easily
-- 📈 **Statistics** - View spending by category
-- 📤 **Export** - Export data to Excel/PDF
-- 💾 **Backup** - Automatic database backup
-- 🎨 **Modern UI** - Beautiful and intuitive interface
+---
 
-## Prerequisites
+## ✨ Features
 
-Before you begin, ensure you have installed:
-- **Node.js** (v14 or higher) - [Download](https://nodejs.org/)
-- **npm** (comes with Node.js)
-- **Git** - [Download](https://git-scm.com/)
-- **Visual Studio Code** (optional) - [Download](https://code.visualstudio.com/)
+| หมวดหมู่ | ฟีเจอร์ |
+|---|---|
+| 📊 **Dashboard** | ภาพรวมรายรับ-รายจ่าย และยอดคงเหลือประจำเดือน |
+| 💸 **Transactions** | เพิ่ม / แก้ไข / ลบ รายการรายรับ-รายจ่าย |
+| 📈 **Statistics** | กราฟและสถิติการใช้จ่ายแยกตามหมวดหมู่ |
+| 📋 **Reports** | รายงานสรุปและ Export ข้อมูลเป็น Excel / PDF |
+| 🎯 **Budget Limits** | ตั้งงบประมาณรายหมวดหมู่ พร้อมแจ้งเตือนใกล้เกิน |
+| 📸 **Scan Slip** | สแกนสลิปอัตโนมัติด้วย OCR |
+| 🔐 **Auth** | ล็อกอิน / สมัครสมาชิก / รีเซ็ตรหัสผ่าน (Supabase Auth) |
+| ☁️ **Cloud Sync** | ซิงค์ข้อมูลข้ามอุปกรณ์ผ่าน Supabase (Pro) |
+| 💎 **Premium** | จัดการ subscription ผ่าน RevenueCat |
+| 🌏 **i18n** | รองรับภาษาไทยและอังกฤษ |
+| 🌙 **Dark Mode** | สลับธีมสว่าง / มืด |
 
-## Installation
+---
 
-1. **Clone or navigate to the project directory:**
+## 🏗️ Tech Stack
+
+| Layer | เทคโนโลยี |
+|---|---|
+| **Frontend** | React 18, Chart.js, Recharts, React Icons |
+| **Desktop** | Electron 27 + SQLite3 |
+| **Mobile** | Capacitor 8 (iOS & Android) |
+| **Backend / Auth** | Supabase (PostgreSQL + Auth + Realtime) |
+| **Payments** | RevenueCat (Capacitor plugin) |
+| **Analytics / Push** | Firebase 10 |
+| **Export** | xlsx, PDFKit |
+| **Build Tool** | react-scripts (CRA), electron-builder |
+
+---
+
+## 📋 Prerequisites
+
+| ซอฟต์แวร์ | เวอร์ชัน |
+|---|---|
+| Node.js | v18+ แนะนำ |
+| npm | มาพร้อม Node.js |
+| Git | ล่าสุด |
+| Xcode | 15+ (สำหรับ iOS) |
+| Android Studio | Hedgehog+ (สำหรับ Android) |
+
+---
+
+## 🚀 Installation
+
 ```bash
-cd finance-manager
-```
+# 1. Clone repo
+git clone <repo-url>
+cd PFM
 
-2. **Install dependencies:**
-```bash
+# 2. ติดตั้ง dependencies
 npm install
+
+# 3. ตั้งค่า environment variables
+cp .env.example .env.local
+# แล้วแก้ไขค่าใน .env.local ตามข้อมูล Supabase / Firebase ของคุณ
 ```
 
-This will install:
-- `electron` - Framework for desktop apps
-- `react` - UI library
-- `better-sqlite3` - Database
-- `chart.js` - Charts for statistics
-- And other required packages
+### Environment Variables ที่จำเป็น
 
-## Running the Application
+```env
+REACT_APP_SUPABASE_URL=https://xxxx.supabase.co
+REACT_APP_SUPABASE_ANON_KEY=your-anon-key
+REACT_APP_FIREBASE_API_KEY=...
+```
 
-### Development Mode
+ดู `.env.example` สำหรับรายการตัวแปรทั้งหมด
 
-Run both React and Electron in development mode:
+---
+
+## ▶️ Running the Application
+
+### 🌐 Web (Browser)
 
 ```bash
+npm start
+# เปิด http://localhost:3000
+```
+
+### 🖥️ Desktop (Electron)
+
+```bash
+# Development — เปิด React + Electron พร้อมกัน
 npm run dev
+
+# Production build สำหรับ macOS
+npm run build-mac
+# ได้ไฟล์ .dmg / .zip ใน dist/
 ```
 
-This will:
-- Start React dev server on http://localhost:3000
-- Launch Electron app
-- Enable hot reload for development
-
-### Production Build
-
-To build the application for macOS:
+### 📱 Mobile (Capacitor)
 
 ```bash
-npm run build-mac
+# Sync web build ไปยัง native projects
+npm run build-android   # Android
+npm run build-ios       # iOS
+
+# Build APK (release)
+npm run build-android-release
+
+# Archive สำหรับ App Store
+npm run archive-ios
+npm run export-ios-appstore
 ```
 
-This creates a `.dmg` installer file in the `dist/` folder.
+---
 
-## Project Structure
+## 📁 Project Structure
 
 ```
-finance-manager/
+PFM/
 ├── public/
-│   ├── index.html          # HTML template
-│   ├── electron.js         # Electron main process
-│   └── preload.js          # Electron security layer
+│   ├── electron.js          # Electron main process
+│   ├── preload.js           # Electron IPC bridge
+│   └── index.html
 ├── src/
-│   ├── components/         # Reusable components
+│   ├── components/
+│   │   ├── ScanSlip.js      # OCR slip scanning
+│   │   └── SyncStatus.js    # Cloud sync indicator
 │   ├── pages/
-│   │   ├── Dashboard.js    # Dashboard page
-│   │   ├── Transactions.js # Transactions page
-│   │   ├── Statistics.js   # Statistics page
-│   │   └── Settings.js     # Settings page
-│   ├── database/
-│   │   └── DatabaseService.js  # SQLite database manager
-│   ├── services/           # API services
+│   │   ├── dashboard.js     # หน้าหลัก / ภาพรวม
+│   │   ├── transactions.js  # รายการธุรกรรม
+│   │   ├── statistics.js    # กราฟสถิติ
+│   │   ├── reports.js       # รายงาน & Export
+│   │   ├── BudgetLimits.js  # งบประมาณรายหมวด
+│   │   ├── PremiumSettings.js # Premium / Subscription
+│   │   ├── settings.js      # ตั้งค่าทั่วไป
+│   │   ├── Login.js         # หน้าเข้าสู่ระบบ
+│   │   ├── Register.js      # หน้าสมัครสมาชิก
+│   │   └── UpdatePassword.js # รีเซ็ตรหัสผ่าน
+│   ├── services/
+│   │   ├── SupabaseService.js   # Supabase API wrapper
+│   │   ├── AuthContext.js       # Auth state (Context)
+│   │   ├── SyncService.js       # Cloud sync logic
+│   │   ├── useSync.js           # Sync hook
+│   │   ├── PaymentService.js    # RevenueCat integration
+│   │   ├── FirebaseConfig.js    # Firebase init
+│   │   └── LanguageContext.js   # i18n context
+│   ├── i18n/                # ไฟล์แปลภาษา (th, en)
+│   ├── database/            # SQLite service (Electron)
 │   ├── styles/
-│   │   ├── App.css         # Main styles
-│   │   └── index.css       # Global styles
-│   ├── App.js              # Main React component
-│   └── index.js            # React entry point
-├── package.json            # Dependencies and scripts
-└── README.md               # This file
+│   │   ├── App.css
+│   │   └── index.css
+│   └── App.js               # Root component + routing
+├── android/                 # Capacitor Android project
+├── ios/                     # Capacitor iOS project
+├── docs/                    # เอกสารเพิ่มเติม
+├── capacitor.config.ts      # Capacitor configuration
+├── firebase.json            # Firebase hosting config
+├── supabase-schema.sql      # Database schema
+├── package.json
+└── README.md
 ```
 
-## Database
+---
 
-The app uses **SQLite3** for data storage:
-- Database file: `~/Library/Application Support/Personal Finance Manager/finance.db` (macOS)
-- Automatically created on first run
-- Stores transactions and categories
+## 🗄️ Database
 
-## Troubleshooting
+### Desktop (Electron)
+ใช้ **SQLite3** เก็บข้อมูลในเครื่อง:
+- Path: `~/Library/Application Support/MoneyMa/finance.db` (macOS)
+- สร้างอัตโนมัติเมื่อเปิดแอปครั้งแรก
 
-### Issue: `npm install` fails
-**Solution:** Clear npm cache and try again:
+### Cloud (Supabase)
+ใช้ **PostgreSQL** ผ่าน Supabase:
+- ดู schema ที่ [`supabase-schema.sql`](supabase-schema.sql)
+- รองรับ Row Level Security (RLS) ต่อ user
+- Update budget schema: [`update-budget-schema.sql`](update-budget-schema.sql)
+
+---
+
+## 📚 Documentation
+
+| ไฟล์ | เนื้อหา |
+|---|---|
+| [QUICK_START.md](QUICK_START.md) | เริ่มต้นใช้งานเร็ว |
+| [SETUP.md](SETUP.md) | ตั้งค่าโปรเจกต์ละเอียด |
+| [SETUP_CHECKLIST.md](SETUP_CHECKLIST.md) | Checklist ก่อน deploy |
+| [AUTH_SETUP_GUIDE.md](AUTH_SETUP_GUIDE.md) | ตั้งค่า Supabase Auth |
+| [AUTH_API_REFERENCE.md](AUTH_API_REFERENCE.md) | API Reference สำหรับ Auth |
+| [AUTH_DEEP_DIVE.md](AUTH_DEEP_DIVE.md) | อธิบาย Auth flow เชิงลึก |
+| [FIREBASE_SETUP_GUIDE.md](FIREBASE_SETUP_GUIDE.md) | ตั้งค่า Firebase |
+| [IOS_RELEASE_GUIDE.md](IOS_RELEASE_GUIDE.md) | วิธี release บน App Store |
+| [ANDROID_SIGNING_CONFIG.md](ANDROID_SIGNING_CONFIG.md) | ตั้งค่า signing key Android |
+| [QUICK_REFERENCE.md](QUICK_REFERENCE.md) | คำสั่งสำคัญสรุปย่อ |
+| [IMPLEMENTATION_COMPLETE.md](IMPLEMENTATION_COMPLETE.md) | บันทึกฟีเจอร์ที่ implement แล้ว |
+| [PHASE_1_COMPLETE.md](PHASE_1_COMPLETE.md) | สรุป Phase 1 |
+| [PHASE_2_GUIDE.md](PHASE_2_GUIDE.md) | แผน Phase 2 |
+
+---
+
+## 🔧 Useful Scripts
+
+```bash
+npm start                      # Web dev server (localhost:3000)
+npm run dev                    # Desktop dev (React + Electron)
+npm run build                  # Production web build
+npm run build-mac              # macOS .dmg installer
+npm run build-android          # Sync + open Android project
+npm run build-android-release  # APK release build
+npm run build-ios              # Sync + open iOS project
+npm run archive-ios            # สร้าง .xcarchive สำหรับ App Store
+npm run export-ios-appstore    # Export .ipa สำหรับ App Store
+```
+
+---
+
+## 🛡️ Security
+
+- ✅ Supabase Row Level Security (RLS) — ข้อมูลแยกต่อ user
+- ✅ Electron Context Isolation — main / renderer แยกกัน
+- ✅ IPC preload bridge — ไม่มี Node.js ใน renderer
+- ✅ Environment variables — ไม่ commit credentials
+- ✅ Capacitor — ไม่ expose native API โดยตรง
+
+---
+
+## 🐛 Troubleshooting
+
+### `npm install` ล้มเหลว
 ```bash
 npm cache clean --force
 npm install
 ```
 
-### Issue: Electron won't start
-**Solution:** Make sure port 3000 is not in use:
+### Supabase connection error (`SocketException: Failed host lookup`)
+- ตรวจสอบ `REACT_APP_SUPABASE_URL` ใน `.env.local`
+- ตรวจสอบการเชื่อมต่ออินเทอร์เน็ต / Network permissions ของ iOS/Android
+
+### Electron ไม่เปิด
 ```bash
-lsof -i :3000  # Check what's using port 3000
+lsof -i :3000   # เช็คว่ามีอะไรใช้ port 3000 อยู่
 ```
 
-### Issue: Database not found
-**Solution:** The database is created automatically on first run. Check application logs for errors.
-
-## Next Steps
-
-### Phase 2: Enhancements
-- [ ] Add chart visualizations
-- [ ] Implement recurring transactions
-- [ ] Add budget limits
-- [ ] Multi-currency support
-- [ ] Cloud sync
-- [ ] Mobile app integration
-
-### Phase 3: Advanced Features
-- [ ] Machine learning for categorization
-- [ ] Receipt OCR
-- [ ] Bank integration
-- [ ] Investment tracking
-- [ ] Tax report generation
-
-## Development Tips
-
-1. **Hot Reload**: Changes to React components reload automatically
-2. **DevTools**: Press `Cmd+Option+I` to open Chrome DevTools
-3. **Database**: Use SQLite Browser to inspect database:
-   - Download [DB Browser for SQLite](https://sqlitebrowser.org/)
-   - Open `~/Library/Application Support/Personal Finance Manager/finance.db`
-
-## Building for Other Platforms
-
-### Windows Build
-```bash
-npm run build && electron-builder --win
-```
-
-### Linux Build
-```bash
-npm run build && electron-builder --linux
-```
-
-## Performance Tips
-
-- The app uses SQLite with WAL (Write-Ahead Logging) for better concurrency
-- Index on frequently queried columns (date, type, category)
-- Paginate large result sets in future versions
-
-## Security
-
-- ✅ Context isolation enabled (main and renderer process separate)
-- ✅ No Node.js in renderer process
-- ✅ IPC preload for secure communication
-- ⚠️ Data stored locally - never sent to servers
-
-## License
-
-MIT License - See LICENSE file for details
-
-## Support
-
-For issues or questions:
-1. Check the troubleshooting section
-2. Review application logs
-3. Create an issue on the project repository
-
-## GitHub Pages
-
-This project includes a GitHub Pages deployment workflow for publishing the static `build/` output.
-
-Deployment guide:
-
-- [GitHub Pages Deploy Guide](/Users/rnaibro/PFM/docs/github-pages-deploy.md)
+### iOS build ล้มเหลว
+- ตรวจสอบ Apple Developer Certificate / Provisioning Profile ใน Xcode
+- ดู [IOS_RELEASE_GUIDE.md](IOS_RELEASE_GUIDE.md)
 
 ---
 
-**Happy budgeting! 💸**
+## 🗺️ Roadmap
+
+### ✅ Phase 1 — เสร็จแล้ว
+- [x] Dashboard, Transactions, Statistics, Reports
+- [x] Supabase Auth (Login / Register / Reset Password)
+- [x] Cloud Sync (Pro)
+- [x] Budget Limits
+- [x] Dark Mode & i18n (TH / EN)
+- [x] Electron Desktop build
+- [x] Capacitor iOS & Android build
+- [x] RevenueCat Premium subscription
+
+### 🚧 Phase 2 — กำลังพัฒนา
+- [ ] Scan Slip ด้วย AI (OCR อัตโนมัติ)
+- [ ] Recurring transactions
+- [ ] Widget สำหรับ iOS / Android
+- [ ] Push notifications เตือนงบประมาณ
+- [ ] Apple Pay / Google Pay integration
+
+### 🔮 Phase 3 — อนาคต
+- [ ] Machine learning จัดหมวดหมู่อัตโนมัติ
+- [ ] Tax report generation
+- [ ] Investment & portfolio tracking
+- [ ] Open Banking integration
+
+---
+
+## 📄 License
+
+MIT License — ดูรายละเอียดใน [LICENSE](LICENSE)
+
+---
+
+**Happy budgeting! 💸 — MoneyMa v1.4.0**

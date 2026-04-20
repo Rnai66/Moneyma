@@ -1,0 +1,731 @@
+/* ──────────────────────────────────────────────────────────────────────────
+   ScanSlip.css — Mobile-first, dark-mode ready
+   Uses a clean utilitarian aesthetic: clear hierarchy, strong type, no noise
+   ────────────────────────────────────────────────────────────────────────── */
+
+/* ── Fonts ────────────────────────────────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+/* ── Tokens ───────────────────────────────────────────────────────────────── */
+.scan-slip {
+  --ss-font: 'IBM Plex Sans Thai', system-ui, sans-serif;
+  --ss-font-mono: 'IBM Plex Mono', monospace;
+
+  /* Light */
+  --ss-bg: #f5f4f0;
+  --ss-surface: #ffffff;
+  --ss-surface-raised: #fafaf8;
+  --ss-border: rgba(0, 0, 0, 0.08);
+  --ss-border-strong: rgba(0, 0, 0, 0.15);
+  --ss-text: #1a1a18;
+  --ss-text-muted: #6b6b66;
+  --ss-text-hint: #9c9c96;
+  --ss-accent: #1a6b4a;
+  --ss-accent-light: #e8f5ef;
+  --ss-accent-text: #ffffff;
+  --ss-danger: #c0392b;
+  --ss-danger-light: #fdf0ee;
+  --ss-warning-light: #fff9ec;
+  --ss-warning: #c47a1a;
+  --ss-tab-active-bg: #1a6b4a;
+  --ss-tab-active-text: #ffffff;
+  --ss-scan-ring: #1a6b4a;
+  --ss-radius: 12px;
+  --ss-radius-sm: 8px;
+  --ss-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 4px 12px rgba(0,0,0,0.04);
+}
+
+@media (prefers-color-scheme: dark) {
+  .scan-slip {
+    --ss-bg: #141412;
+    --ss-surface: #1e1e1b;
+    --ss-surface-raised: #252522;
+    --ss-border: rgba(255, 255, 255, 0.07);
+    --ss-border-strong: rgba(255, 255, 255, 0.14);
+    --ss-text: #e8e6df;
+    --ss-text-muted: #9c9a92;
+    --ss-text-hint: #6b6a65;
+    --ss-accent: #2eb87a;
+    --ss-accent-light: #1a2e24;
+    --ss-accent-text: #0a1a11;
+    --ss-danger: #e05c4c;
+    --ss-danger-light: #2a1614;
+    --ss-warning-light: #1e1a10;
+    --ss-warning: #d49a3a;
+    --ss-tab-active-bg: #2eb87a;
+    --ss-tab-active-text: #0a1a11;
+    --ss-scan-ring: #2eb87a;
+    --ss-shadow: 0 1px 3px rgba(0,0,0,0.3), 0 4px 16px rgba(0,0,0,0.2);
+  }
+}
+
+/* ── Shell ────────────────────────────────────────────────────────────────── */
+.scan-slip {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  max-height: 100dvh;
+  background: var(--ss-bg);
+  font-family: var(--ss-font);
+  color: var(--ss-text);
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+
+/* ── Header ───────────────────────────────────────────────────────────────── */
+.scan-slip__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px 12px;
+  background: var(--ss-surface);
+  border-bottom: 1px solid var(--ss-border);
+  flex-shrink: 0;
+}
+
+.scan-slip__title {
+  font-size: 17px;
+  font-weight: 600;
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+.scan-slip__close {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: var(--ss-surface-raised);
+  color: var(--ss-text-muted);
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, color 0.15s;
+}
+.scan-slip__close:hover {
+  background: var(--ss-border-strong);
+  color: var(--ss-text);
+}
+
+/* ── Tabs ─────────────────────────────────────────────────────────────────── */
+.scan-slip__tabs {
+  display: flex;
+  background: var(--ss-surface);
+  border-bottom: 1px solid var(--ss-border);
+  flex-shrink: 0;
+  padding: 0 8px;
+  gap: 4px;
+}
+
+.scan-slip__tab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 4px 12px;
+  border: none;
+  background: transparent;
+  color: var(--ss-text-muted);
+  font-family: var(--ss-font);
+  font-size: 12px;
+  font-weight: 400;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: color 0.15s, border-color 0.15s;
+  position: relative;
+}
+
+.scan-slip__tab-icon {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.scan-slip__tab--active {
+  color: var(--ss-accent);
+  font-weight: 600;
+  border-bottom-color: var(--ss-accent);
+}
+
+/* ── Body ─────────────────────────────────────────────────────────────────── */
+.scan-slip__body {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+
+.scan-slip__pane {
+  padding: 20px;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ── Drop zone ────────────────────────────────────────────────────────────── */
+.scan-slip__drop-zone {
+  flex: 1;
+  min-height: 280px;
+  border: 2px dashed var(--ss-border-strong);
+  border-radius: var(--ss-radius);
+  background: var(--ss-surface);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+  padding: 32px 24px;
+  text-align: center;
+}
+
+.scan-slip__drop-zone:hover,
+.scan-slip__drop-zone:focus-within {
+  border-color: var(--ss-accent);
+  background: var(--ss-accent-light);
+}
+
+.scan-slip__drop-icon {
+  font-size: 48px;
+  line-height: 1;
+  margin-bottom: 8px;
+}
+
+.scan-slip__drop-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.scan-slip__drop-hint {
+  font-size: 13px;
+  color: var(--ss-text-muted);
+  margin: 0;
+}
+
+.scan-slip__file-input {
+  display: none;
+}
+
+/* ── Auto-scan start ──────────────────────────────────────────────────────── */
+.scan-slip__autoscan-start {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 40px 24px;
+  text-align: center;
+}
+
+.scan-slip__autoscan-start .scan-slip__drop-hint {
+  max-width: 260px;
+  line-height: 1.55;
+}
+
+/* ── Scanning indicator ───────────────────────────────────────────────────── */
+.scan-slip__scanning {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 60px 24px;
+}
+
+.scan-slip__spinner {
+  width: 44px;
+  height: 44px;
+  border: 3px solid var(--ss-border-strong);
+  border-top-color: var(--ss-accent);
+  border-radius: 50%;
+  animation: ss-spin 0.8s linear infinite;
+}
+
+@keyframes ss-spin {
+  to { transform: rotate(360deg); }
+}
+
+.scan-slip__scanning-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.scan-slip__scanning-hint {
+  font-size: 13px;
+  color: var(--ss-text-muted);
+  margin: 0;
+}
+
+/* ── Error state ──────────────────────────────────────────────────────────── */
+.scan-slip__error {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 48px 24px;
+  text-align: center;
+}
+
+.scan-slip__error-icon { font-size: 40px; line-height: 1; }
+
+.scan-slip__error-message {
+  font-size: 14px;
+  color: var(--ss-danger);
+  background: var(--ss-danger-light);
+  padding: 10px 16px;
+  border-radius: var(--ss-radius-sm);
+  margin: 0;
+  max-width: 280px;
+  line-height: 1.5;
+}
+
+/* ── Single result ────────────────────────────────────────────────────────── */
+.scan-slip__result {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  animation: ss-fadein 0.25s ease;
+}
+
+@keyframes ss-fadein {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.scan-slip__preview-wrap {
+  position: relative;
+  border-radius: var(--ss-radius);
+  overflow: hidden;
+  background: var(--ss-surface);
+  box-shadow: var(--ss-shadow);
+  max-height: 220px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.scan-slip__preview-img {
+  width: 100%;
+  max-height: 220px;
+  object-fit: contain;
+  display: block;
+}
+
+.scan-slip__duplicate-badge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: var(--ss-warning-light);
+  color: var(--ss-warning);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 20px;
+  border: 1px solid var(--ss-warning);
+}
+
+.scan-slip__result-card {
+  background: var(--ss-surface);
+  border-radius: var(--ss-radius);
+  padding: 20px;
+  box-shadow: var(--ss-shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.scan-slip__result-label {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ss-text-muted);
+  margin: 0 0 2px;
+}
+
+.scan-slip__form-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.scan-slip__label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ss-text-muted);
+  letter-spacing: 0.02em;
+}
+
+.scan-slip__input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  background: var(--ss-surface-raised);
+  border: 1px solid var(--ss-border-strong);
+  border-radius: var(--ss-radius-sm);
+  color: var(--ss-text);
+  font-family: var(--ss-font);
+  font-size: 15px;
+  font-weight: 500;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.scan-slip__input:focus {
+  outline: none;
+  border-color: var(--ss-accent);
+  box-shadow: 0 0 0 3px var(--ss-accent-light);
+}
+
+.scan-slip__select {
+  cursor: pointer;
+  padding-right: 32px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236b6b66' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+}
+
+/* ── Buttons ──────────────────────────────────────────────────────────────── */
+.scan-slip__btn {
+  font-family: var(--ss-font);
+  font-size: 14px;
+  font-weight: 600;
+  padding: 12px 20px;
+  border-radius: var(--ss-radius-sm);
+  border: none;
+  cursor: pointer;
+  transition: opacity 0.15s, background 0.15s;
+  white-space: nowrap;
+}
+
+.scan-slip__btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.scan-slip__btn--primary {
+  background: var(--ss-accent);
+  color: var(--ss-accent-text);
+  flex: 1;
+}
+
+.scan-slip__btn--primary:hover:not(:disabled) {
+  opacity: 0.88;
+}
+
+.scan-slip__btn--secondary {
+  background: var(--ss-surface-raised);
+  color: var(--ss-text);
+  border: 1px solid var(--ss-border-strong);
+}
+
+.scan-slip__btn--secondary:hover:not(:disabled) {
+  background: var(--ss-border);
+}
+
+.scan-slip__btn--ghost {
+  background: transparent;
+  color: var(--ss-text-muted);
+  border: 1px solid var(--ss-border-strong);
+}
+
+.scan-slip__btn--sm {
+  font-size: 12px;
+  padding: 6px 12px;
+}
+
+.scan-slip__result-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.scan-slip__result-actions--sticky {
+  position: sticky;
+  bottom: 0;
+  background: var(--ss-bg);
+  padding: 12px 0 0;
+  border-top: 1px solid var(--ss-border);
+  margin-top: 8px;
+}
+
+/* ── Batch progress ───────────────────────────────────────────────────────── */
+.scan-slip__batch-progress {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 48px 24px;
+  text-align: center;
+}
+
+.scan-slip__progress-bar {
+  width: 100%;
+  max-width: 280px;
+  height: 5px;
+  background: var(--ss-border-strong);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.scan-slip__progress-fill {
+  height: 100%;
+  background: var(--ss-accent);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+/* ── Batch results ────────────────────────────────────────────────────────── */
+.scan-slip__batch-results {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  animation: ss-fadein 0.25s ease;
+}
+
+.scan-slip__batch-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.scan-slip__batch-summary {
+  font-size: 14px;
+  color: var(--ss-text-muted);
+  margin: 0;
+}
+
+.scan-slip__batch-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.scan-slip__batch-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: var(--ss-surface);
+  border-radius: var(--ss-radius-sm);
+  padding: 14px;
+  border: 1.5px solid var(--ss-border);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.scan-slip__batch-item:hover {
+  border-color: var(--ss-accent);
+}
+
+.scan-slip__batch-item--selected {
+  border-color: var(--ss-accent);
+  background: var(--ss-accent-light);
+}
+
+.scan-slip__batch-check {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1.5px solid var(--ss-border-strong);
+  background: var(--ss-surface-raised);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ss-accent);
+  flex-shrink: 0;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.scan-slip__batch-item--selected .scan-slip__batch-check {
+  background: var(--ss-accent);
+  border-color: var(--ss-accent);
+  color: var(--ss-accent-text);
+}
+
+.scan-slip__batch-info {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  align-items: center;
+}
+
+.scan-slip__batch-category {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ss-text);
+}
+
+.scan-slip__batch-amount {
+  font-family: var(--ss-font-mono);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ss-text);
+}
+
+.scan-slip__batch-date {
+  font-size: 12px;
+  color: var(--ss-text-muted);
+  font-family: var(--ss-font-mono);
+}
+
+.scan-slip__batch-note {
+  width: 100%;
+  font-size: 12px;
+  color: var(--ss-text-hint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Slip detail card ─────────────────────────────────────────────────────── */
+.scan-slip__slip-detail-card {
+  background: var(--ss-surface);
+  border-radius: var(--ss-radius);
+  padding: 16px;
+  box-shadow: var(--ss-shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  overflow: hidden;
+  border: 1px solid var(--ss-border);
+}
+
+/* Header row: status + bank */
+.scan-slip__slip-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-bottom: 12px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--ss-border);
+}
+
+.scan-slip__status-badge {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.scan-slip__bank-tag {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ss-text-muted);
+  background: var(--ss-surface-raised);
+  border: 1px solid var(--ss-border);
+  padding: 3px 10px;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+
+/* Detail rows */
+.scan-slip__detail-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--ss-border);
+}
+
+.scan-slip__detail-row:last-child {
+  border-bottom: none;
+}
+
+.scan-slip__detail-row--amount {
+  background: var(--ss-accent-light);
+  margin: 8px -16px;
+  padding: 12px 16px;
+  border-bottom: none;
+  border-radius: 0;
+}
+
+.scan-slip__detail-icon {
+  font-size: 17px;
+  line-height: 1;
+  flex-shrink: 0;
+  margin-top: 1px;
+  width: 22px;
+  text-align: center;
+}
+
+.scan-slip__detail-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.scan-slip__detail-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ss-text-hint);
+}
+
+.scan-slip__detail-value {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ss-text);
+  word-break: break-word;
+}
+
+.scan-slip__detail-sub {
+  font-size: 12px;
+  font-family: var(--ss-font-mono);
+  color: var(--ss-text-muted);
+}
+
+.scan-slip__detail-amount {
+  font-family: var(--ss-font-mono);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--ss-accent);
+  letter-spacing: -0.02em;
+}
+
+/* Sub-items (itemized breakdown) */
+.scan-slip__sub-items {
+  background: var(--ss-surface-raised);
+  border-radius: var(--ss-radius-sm);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 4px 0;
+  border: 1px solid var(--ss-border);
+}
+
+.scan-slip__sub-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+  color: var(--ss-text-muted);
+}
+
+.scan-slip__sub-item span:last-child {
+  font-family: var(--ss-font-mono);
+  font-weight: 600;
+  color: var(--ss-text);
+  white-space: nowrap;
+}

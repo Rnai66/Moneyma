@@ -1,0 +1,8 @@
+{
+  "instructions": [
+    "Download google-services.json from Firebase Console",
+    "Place the real file at android/app/google-services.json",
+    "Do not commit the real file"
+  ],
+  "firebase_console_path": "Project settings > Your apps > Android app > Download google-services.json"
+}

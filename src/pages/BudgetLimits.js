@@ -1,6 +1,23 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import SupabaseService from '../services/SupabaseService';
+import { useAuth } from '../services/AuthContext';
 
-function BudgetLimits({ transactions, t }) {
+const WEB_BUDGETS_KEY = 'webBudgets';
+
+function readWebBudgets() {
+  try {
+    return JSON.parse(localStorage.getItem(WEB_BUDGETS_KEY) || '[]');
+  } catch (error) {
+    return [];
+  }
+}
+
+function writeWebBudgets(items) {
+  localStorage.setItem(WEB_BUDGETS_KEY, JSON.stringify(items));
+}
+
+function BudgetLimits({ transactions, t, storageMode }) {
+  const { user } = useAuth();
   const [budgetStatus, setBudgetStatus] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
@@ -13,12 +30,53 @@ function BudgetLimits({ transactions, t }) {
   const loadBudgets = useCallback(async () => {
     try {
       setLoading(true);
-      if (window.electronAPI) {
-        const s = await window.electronAPI.getBudgetStatus(currentMonth);
-        setBudgetStatus(s || []);
+      if (storageMode === 'cloud' && user) {
+        const { status } = await SupabaseService.getBudgetStatus(user.id, currentMonth);
+        setBudgetStatus(status || []);
+      } else if (window.electronAPI) {
+        const data = await window.electronAPI.getBudgetStatus(currentMonth);
+        const statusList = data.map(b => ({
+          ...b,
+          used: b.spent,
+          status: b.isExceeded ? 'exceeded' : (b.isWarning ? 'warning' : 'ok')
+        }));
+        setBudgetStatus(statusList || []);
+      } else {
+        const allBudgets = readWebBudgets();
+        const monthBudgets = allBudgets.filter(b => b.month === currentMonth);
+        
+        const statusList = monthBudgets.map(budget => {
+          const limitAmount = parseFloat(budget.limit);
+          const alertThreshold = parseFloat(budget.alertThreshold) || 80;
+          
+          const spent = transactions
+            .filter(tx => tx.type === 'expense' && tx.category === budget.category && String(tx.date).startsWith(currentMonth))
+            .reduce((sum, tx) => sum + parseFloat(tx.amount || 0), 0);
+            
+          const percentage = limitAmount > 0 ? (spent / limitAmount) * 100 : 0;
+          const isExceeded = spent > limitAmount;
+          const isWarning = percentage >= alertThreshold && !isExceeded;
+          
+          return {
+            category: budget.category,
+            limit: limitAmount,
+            alertThreshold: alertThreshold,
+            used: spent,
+            remaining: limitAmount - spent,
+            percentage: Math.round(percentage),
+            status: isExceeded ? 'exceeded' : (isWarning ? 'warning' : 'ok')
+          };
+        });
+        
+        setBudgetStatus(statusList);
       }
-    } catch (e) { console.error(e); } finally { setLoading(false); }
-  }, [currentMonth]);
+    } catch (e) {
+      console.error('Error loading budgets:', e);
+      setBudgetStatus([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [currentMonth, transactions, storageMode, user]);
 
   useEffect(() => { loadBudgets(); }, [loadBudgets]);
 
@@ -26,17 +84,58 @@ function BudgetLimits({ transactions, t }) {
     e.preventDefault();
     try {
       setLoading(true);
-      if (window.electronAPI) {
-        await window.electronAPI.setBudget(formData.category, parseFloat(formData.limit), currentMonth, parseFloat(formData.alertThreshold));
-        setFormData({ category: '', limit: '', alertThreshold: 80 }); setShowForm(false); await loadBudgets();
+      const limitVal = parseFloat(formData.limit);
+      const alertVal = parseInt(formData.alertThreshold);
+
+      if (storageMode === 'cloud' && user) {
+        const res = await SupabaseService.setBudget(user.id, formData.category, limitVal, alertVal, 'monthly');
+        if (res.error) throw res.error;
+      } else if (window.electronAPI) {
+        await window.electronAPI.setBudget(formData.category, limitVal, currentMonth, alertVal);
+      } else {
+        const allBudgets = readWebBudgets();
+        const filtered = allBudgets.filter(b => !(b.category === formData.category && b.month === currentMonth));
+        filtered.push({
+          id: Date.now(),
+          category: formData.category,
+          limit: limitVal,
+          month: currentMonth,
+          alertThreshold: alertVal
+        });
+        writeWebBudgets(filtered);
       }
-    } catch (err) { console.error(err); alert(t.error); } finally { setLoading(false); }
+
+      setFormData({ category: '', limit: '', alertThreshold: 80 });
+      setShowForm(false);
+      await loadBudgets();
+    } catch (err) {
+      console.error('Error setting budget:', err);
+      alert(t.error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleDelete = async (category) => {
     if (window.confirm(t.deleteBudgetConfirm.replace('{category}', category))) {
-      try { setLoading(true); if (window.electronAPI) { await window.electronAPI.deleteBudget(category, currentMonth); await loadBudgets(); } }
-      catch (e) { console.error(e); } finally { setLoading(false); }
+      try {
+        setLoading(true);
+        if (storageMode === 'cloud' && user) {
+          await SupabaseService.deleteBudget(user.id, category, 'monthly');
+        } else if (window.electronAPI) {
+          await window.electronAPI.deleteBudget(category, currentMonth);
+        } else {
+          const allBudgets = readWebBudgets();
+          const filtered = allBudgets.filter(b => !(b.category === category && b.month === currentMonth));
+          writeWebBudgets(filtered);
+        }
+        await loadBudgets();
+      } catch (e) {
+        console.error('Error deleting budget:', e);
+        alert(t.error);
+      } finally {
+        setLoading(false);
+      }
     }
   };
 
@@ -52,7 +151,11 @@ function BudgetLimits({ transactions, t }) {
     ok: { color: '#10b981', bg: 'rgba(16,185,129,0.1)', label: t.statusOnTrack, gradient: 'linear-gradient(90deg,#10b981,#059669)' },
   };
 
-  const getStatus = (b) => b.isExceeded ? statusConfig.exceeded : b.isWarning ? statusConfig.warning : statusConfig.ok;
+  const getStatus = (b) => {
+    if (b.status === 'exceeded') return statusConfig.exceeded;
+    if (b.status === 'warning') return statusConfig.warning;
+    return statusConfig.ok;
+  };
 
   const tips = [t.tip1, t.tip2, t.tip3, t.tip4];
 
@@ -133,7 +236,7 @@ function BudgetLimits({ transactions, t }) {
                   <div style={{ marginBottom: '16px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '13px' }}>
                       <span style={{ fontWeight: '600', color: 'var(--color-text-primary)' }}>
-                        {fmt(b.spent)} <span style={{ fontWeight: '400', color: 'var(--color-text-secondary)' }}>/ {fmt(b.limit)}</span>
+                        {fmt(b.used)} <span style={{ fontWeight: '400', color: 'var(--color-text-secondary)' }}>/ {fmt(b.limit)}</span>
                       </span>
                       <span style={{ fontWeight: '700', color: st.color }}>{b.percentage}%</span>
                     </div>

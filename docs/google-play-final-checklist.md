@@ -23,9 +23,8 @@ Privacy Policy URL:
 - Confirm contact email is:
   `rnaibro@gmail.com`
 - Confirm policy content matches the production app build
-- If you choose exact providers later, update policy to name them
-  Example:
-  `Firebase Authentication`, `Cloud Firestore`, `Firebase Crashlytics`
+- Confirm the policy names `Supabase` for authentication and cloud backup or synchronization if that is the production setup
+- Confirm the crash reporting provider is also named once selected for production
 
 ## 3. Data Safety in Play Console
 
@@ -90,7 +89,7 @@ Privacy Policy URL:
 
 ## 8. Nice-to-Have Before Production
 
-- Add named provider references to privacy policy
+- If using Supabase in production, add exact Supabase product names where appropriate
 - Add in-app link to privacy policy
 - Add in-app account deletion/help screen
 - Add a release notes draft for version `1.3.0`

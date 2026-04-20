@@ -16,6 +16,19 @@
 	<string>6.0</string>
 	<key>CFBundleName</key>
 	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>com.personalfinance.manager.auth</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>moneyma</string>
+			</array>
+		</dict>
+	</array>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -47,5 +60,11 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>ต้องการเข้าถึง Gallery เพื่อสแกนสลิป</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>ต้องการบันทึกรูปลงใน Gallery</string>
+	<key>NSCameraUsageDescription</key>
+	<string>ต้องการกล้องเพื่อถ่ายรูปสลิป</string>
 </dict>
 </plist>

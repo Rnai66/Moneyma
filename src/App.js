@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { App as CapacitorApp } from '@capacitor/app';
+import { Capacitor } from '@capacitor/core';
 import './styles/App.css';
 import Dashboard from './pages/dashboard';
 import Transactions from './pages/transactions';
@@ -6,9 +8,38 @@ import Statistics from './pages/statistics';
 import Reports from './pages/reports';
 import BudgetLimits from './pages/BudgetLimits';
 import Settings from './pages/settings';
+import Login from './pages/Login';
+import Register from './pages/Register';
+import UpdatePassword from './pages/UpdatePassword';
+import PremiumSettings from './pages/PremiumSettings';
 import { getTranslation } from './i18n';
+import { AuthProvider, useAuth } from './services/AuthContext';
+import { LanguageProvider } from './services/LanguageContext';
+import { useSync } from './services/useSync';
+import SupabaseService from './services/SupabaseService';
+import { SubscriptionProvider } from './SubscriptionContext/SubscriptionContext';
+import { PaywallTrigger } from './SubscriptionContext/PaywallScreen';
 
 const WEB_TRANSACTIONS_KEY = 'webTransactions';
+
+function getDeepLinkPath(url) {
+  try {
+    const parsedUrl = new URL(url);
+    const path = parsedUrl.pathname && parsedUrl.pathname !== '/' ? parsedUrl.pathname : `/${parsedUrl.host}`;
+    const searchParams = new URLSearchParams(parsedUrl.search);
+
+    if (path.includes('update-password')) {
+      searchParams.set('mode', 'update-password');
+      const search = searchParams.toString();
+      return `/${search ? `?${search}` : ''}${parsedUrl.hash || ''}`;
+    }
+
+    return `${path}${parsedUrl.search || ''}${parsedUrl.hash || ''}`;
+  } catch (error) {
+    console.error('Failed to parse deep link URL:', error);
+    return null;
+  }
+}
 
 function normalizeTransaction(tx, index = 0) {
   const fallbackDate = new Date().toISOString().split('T')[0];
@@ -21,6 +52,17 @@ function normalizeTransaction(tx, index = 0) {
     description: typeof tx?.description === 'string' ? tx.description : '',
     date: typeof tx?.date === 'string' && tx.date.trim() ? tx.date : fallbackDate,
   };
+}
+
+function generateUUID() {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : ((r & 0x3) | 0x8);
+    return v.toString(16);
+  });
 }
 
 function getWebTransactions() {
@@ -43,11 +85,15 @@ function getWebSummary(transactions) {
   }, { totalIncome: 0, totalExpense: 0, balance: 0 });
 }
 
-function App() {
+function MainApp({ onRequireLogin }) {
   const [currentPage, setCurrentPage] = useState('dashboard');
   const [transactions, setTransactions] = useState([]);
   const [summary, setSummary] = useState({ totalIncome: 0, totalExpense: 0, balance: 0 });
   const [loading, setLoading] = useState(true);
+
+  const { isPro, isAuthenticated, user } = useAuth();
+  const { manualSync } = useSync();
+  const [hasAutoSynced, setHasAutoSynced] = useState(false);
 
   const [darkMode, setDarkMode] = useState(() => {
     const saved = localStorage.getItem('darkMode');
@@ -58,9 +104,14 @@ function App() {
     return localStorage.getItem('language') || 'th';
   });
 
+  const [storageMode, setStorageMode] = useState(() => {
+    return localStorage.getItem('storageMode') || 'local';
+  });
+
   const t = getTranslation(language);
 
-  useEffect(() => { loadData(); }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { loadData(); }, [storageMode, isAuthenticated, isPro]);
 
   useEffect(() => {
     localStorage.setItem('darkMode', JSON.stringify(darkMode));
@@ -71,18 +122,68 @@ function App() {
     localStorage.setItem('language', language);
   }, [language]);
 
+  useEffect(() => {
+    localStorage.setItem('storageMode', storageMode);
+  }, [storageMode]);
+
   const loadData = async () => {
     try {
       setLoading(true);
-      if (window.electronAPI) {
+      let currentItems = [];
+
+      if (storageMode === 'cloud' && isAuthenticated && isPro && user) {
+        const { transactions: cloudTx, error } = await SupabaseService.getTransactions(user.id);
+        if (error) {
+          console.error('Cloud load error:', error);
+          setTransactions([]);
+        } else {
+          setTransactions(cloudTx || []);
+          setSummary(getWebSummary(cloudTx || []));
+          currentItems = cloudTx || [];
+        }
+      } else if (window.electronAPI) {
         const trans = await window.electronAPI.getTransactions({});
         const sum = await window.electronAPI.getSummary();
         setTransactions(trans || []);
         setSummary(sum || { totalIncome: 0, totalExpense: 0, balance: 0 });
+        currentItems = trans || [];
       } else {
         const localTransactions = getWebTransactions();
-        setTransactions(localTransactions);
-        setSummary(getWebSummary(localTransactions));
+        let migrated = false;
+        
+        // Migrate numeric IDs to UUIDs to prevent Supabase type sync errors
+        const mappedTransactions = localTransactions.map(tx => {
+          if (typeof tx.id === 'number' || (typeof tx.id === 'string' && tx.id.length < 32)) {
+            migrated = true;
+            return { ...tx, id: generateUUID() };
+          }
+          return tx;
+        });
+
+        if (migrated) {
+          localStorage.setItem(WEB_TRANSACTIONS_KEY, JSON.stringify(mappedTransactions));
+        }
+
+        setTransactions(mappedTransactions);
+        setSummary(getWebSummary(mappedTransactions));
+        
+        currentItems = mappedTransactions;
+      }
+
+      // Auto-Sync (Only in local mode)
+      if (storageMode !== 'cloud' && isAuthenticated && isPro && !hasAutoSynced) {
+        setHasAutoSynced(true);
+        manualSync(currentItems).then(async (mergedTransactions) => {
+          if (mergedTransactions) {
+            if (window.electronAPI && window.electronAPI.saveAllTransactions) {
+              await window.electronAPI.saveAllTransactions(mergedTransactions);
+            } else {
+              localStorage.setItem(WEB_TRANSACTIONS_KEY, JSON.stringify(mergedTransactions));
+            }
+            setTransactions(mergedTransactions);
+            setSummary(getWebSummary(mergedTransactions));
+          }
+        }).catch(err => console.error('Auto sync failed', err));
       }
     } catch (error) {
       console.error('Error loading data:', error);
@@ -92,14 +193,15 @@ function App() {
   };
 
   const renderPage = () => {
-    const shared = { t };
+    const shared = { t, storageMode, setStorageMode };
     switch (currentPage) {
       case 'dashboard': return <Dashboard summary={summary} transactions={transactions.slice(0, 5)} {...shared} />;
       case 'transactions': return <Transactions transactions={transactions} onRefresh={loadData} {...shared} />;
       case 'statistics': return <Statistics transactions={transactions} darkMode={darkMode} {...shared} />;
       case 'reports': return <Reports transactions={transactions} darkMode={darkMode} {...shared} />;
       case 'budget': return <BudgetLimits transactions={transactions} {...shared} />;
-      case 'settings': return <Settings darkMode={darkMode} onDarkModeChange={setDarkMode} language={language} onLanguageChange={setLanguage} transactions={transactions} onDataRestored={loadData} {...shared} />;
+      case 'premium': return <PremiumSettings setCurrentPage={setCurrentPage} />;
+      case 'settings': return <Settings darkMode={darkMode} onDarkModeChange={setDarkMode} language={language} onLanguageChange={setLanguage} transactions={transactions} onDataRestored={loadData} onRequireLogin={onRequireLogin} {...shared} />;
       default: return <Dashboard summary={summary} transactions={transactions.slice(0, 5)} {...shared} />;
     }
   };
@@ -110,6 +212,7 @@ function App() {
     { id: 'statistics', icon: '◭', label: t.navStatistics, hint: t.statisticsSubtitle },
     { id: 'reports', icon: '▣', label: t.navReports, hint: t.reportsSubtitle },
     { id: 'budget', icon: '◎', label: t.navBudget, hint: t.budgetSubtitle },
+    { id: 'premium', icon: '💎', label: 'Premium', hint: 'อัปเกรดเพื่อปลดล็อกฟีเจอร์' },
     { id: 'settings', icon: '◌', label: t.navSettings, hint: t.settingsSubtitle },
   ];
 
@@ -187,7 +290,7 @@ function App() {
       </main>
 
       <nav className="mobile-nav">
-        {NAV_ITEMS.map(item => (
+        {NAV_ITEMS.filter(item => item.id !== 'premium').map(item => (
           <button
             key={item.id}
             className={currentPage === item.id ? 'active' : ''}
@@ -198,7 +301,118 @@ function App() {
           </button>
         ))}
       </nav>
+
+      <button 
+        className="mobile-premium-btn" 
+        onClick={() => setCurrentPage('premium')}
+        title="Premium"
+      >
+        💎
+      </button>
     </div>
+  );
+}
+
+// Auth wrapper component
+function AppWrapper() {
+  const { isAuthenticated, isRecovery, loading: authLoading } = useAuth();
+  const [authMode, setAuthMode] = useState('login'); // 'login' or 'register'
+  
+  const [isGuest, setIsGuest] = useState(() => localStorage.getItem('guestMode') === 'true');
+
+  useEffect(() => {
+    localStorage.setItem('guestMode', isGuest);
+  }, [isGuest]);
+
+  // Detect recovery mode from URL
+  const urlHash = window.location.hash;
+  const urlSearch = window.location.search;
+  const urlPath = window.location.pathname;
+  const urlParams = new URLSearchParams(urlSearch);
+  const combined = urlHash + urlSearch;
+  const isUpdatePasswordMode = urlParams.get('mode') === 'update-password';
+  const isUpdatePasswordPath = urlPath === '/update-password' || urlPath.includes('update-password');
+  const hasRecoveryToken = combined.includes('type=recovery') || 
+    (combined.includes('access_token') && combined.includes('type=recovery'));
+
+  if (authLoading) {
+    return (
+      <div className="app" style={{ justifyContent: 'center', alignItems: 'center' }}>
+        <div className="loading-inner">
+          <div className="loading-spinner" />
+          <h1>💰 MoneyMa</h1>
+          <p>Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show UpdatePassword if: isRecovery flag set, or URL is /update-password, or recovery token in URL
+  if (isRecovery || isUpdatePasswordMode || isUpdatePasswordPath || hasRecoveryToken) {
+    return <UpdatePassword onUpdateSuccess={() => {
+      // Clear the hash/path and go back to login
+      window.history.replaceState({}, document.title, '/');
+      window.location.reload();
+    }} />;
+  }
+
+  // Show auth pages if not authenticated AND not guest
+  if (!isAuthenticated && !isGuest) {
+    if (authMode === 'login') {
+      return (
+        <Login
+          onSwitchToRegister={() => setAuthMode('register')}
+          onLoginSuccess={() => { }}
+          onContinueAsGuest={() => setIsGuest(true)}
+        />
+      );
+    } else {
+      return (
+        <Register
+          onSwitchToLogin={() => setAuthMode('login')}
+          onRegisterSuccess={() => setAuthMode('login')}
+        />
+      );
+    }
+  }
+
+  // Show main app if authenticated or guest
+  return <MainApp onRequireLogin={() => setIsGuest(false)} />;
+}
+
+function App() {
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) {
+      return undefined;
+    }
+
+    const listener = CapacitorApp.addListener('appUrlOpen', ({ url }) => {
+      const deepLinkPath = getDeepLinkPath(url);
+      if (!deepLinkPath) {
+        return;
+      }
+
+      if (deepLinkPath.includes('/update-password')) {
+        window.location.replace(deepLinkPath);
+      }
+    });
+
+    return () => {
+      listener.then((handle) => handle.remove()).catch((error) => {
+        console.error('Failed to remove deep link listener:', error);
+      });
+    };
+  }, []);
+
+  return (
+    <LanguageProvider>
+      <AuthProvider>
+        <SubscriptionProvider>
+          <AppWrapper />
+          <PaywallTrigger />
+        </SubscriptionProvider>
+      </AuthProvider>
+    </LanguageProvider>
   );
 }
 

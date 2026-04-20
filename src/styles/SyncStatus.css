@@ -1,0 +1,218 @@
+/* Sync Status Component Styles */
+
+.sync-status {
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  border-left: 4px solid #3498db;
+  border-radius: 8px;
+  padding: 1rem;
+  margin: 1rem 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.sync-status-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.sync-status-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.sync-status-icon {
+  font-size: 1.5rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+.sync-status-title {
+  font-weight: 600;
+  color: #2c3e50;
+  font-size: 0.95rem;
+}
+
+.sync-offline-badge {
+  background: #e74c3c;
+  color: white;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  margin-left: auto;
+}
+
+.sync-status-message {
+  margin: 0;
+  color: #34495e;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.sync-status-detail {
+  margin: 0.25rem 0 0 0;
+  color: #7f8c8d;
+  font-size: 0.85rem;
+}
+
+.sync-status-time {
+  margin: 0.25rem 0 0 0;
+  color: #95a5a6;
+  font-size: 0.8rem;
+  font-style: italic;
+}
+
+.sync-retry-button {
+  margin-top: 0.75rem;
+  padding: 0.5rem 1rem;
+  background-color: #3498db;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.sync-retry-button:hover {
+  background-color: #2980b9;
+  transform: translateY(-1px);
+}
+
+.sync-retry-button:active {
+  transform: translateY(0);
+}
+
+.sync-reconnected {
+  background-color: rgba(39, 174, 96, 0.1);
+  border-radius: 4px;
+  padding: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.sync-reconnected p {
+  margin: 0 0 0.5rem 0;
+  color: #27ae60;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.sync-reconnected .sync-retry-button {
+  background-color: #27ae60;
+  margin-top: 0;
+}
+
+.sync-reconnected .sync-retry-button:hover {
+  background-color: #229954;
+}
+
+.sync-progress-bar {
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    #3498db 0%,
+    #2980b9 50%,
+    #3498db 100%
+  );
+  background-size: 200% 100%;
+  animation: progressMove 1.5s infinite;
+  margin-top: 0.5rem;
+  border-radius: 1px;
+}
+
+@keyframes progressMove {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* Dark Mode */
+.dark-mode .sync-status {
+  background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+}
+
+.dark-mode .sync-status-icon {
+  color: #ecf0f1;
+}
+
+.dark-mode .sync-status-title {
+  color: #ecf0f1;
+}
+
+.dark-mode .sync-status-message {
+  color: #bdc3c7;
+}
+
+.dark-mode .sync-status-detail {
+  color: #95a5a6;
+}
+
+.dark-mode .sync-status-time {
+  color: #7f8c8d;
+}
+
+/* Responsive */
+@media (max-width: 480px) {
+  .sync-status {
+    padding: 0.75rem;
+    margin: 0.5rem 0;
+  }
+
+  .sync-status-header {
+    flex-wrap: wrap;
+  }
+
+  .sync-offline-badge {
+    margin-left: 0;
+    margin-top: 0.5rem;
+  }
+
+  .sync-status-message {
+    font-size: 0.85rem;
+  }
+}
+
+/* Status-specific styles */
+.sync-status.syncing {
+  border-left-color: #3498db;
+}
+
+.sync-status.completed {
+  border-left-color: #27ae60;
+}
+
+.sync-status.failed {
+  border-left-color: #e74c3c;
+}
+
+.sync-status.offline {
+  border-left-color: #f39c12;
+}

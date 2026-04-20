@@ -1,0 +1,64 @@
+platform :ios, '15.0'
+
+require 'fileutils'
+inhibit_all_warnings!
+
+target 'App' do
+  use_modular_headers!
+end
+
+post_install do |installer|
+  installer.pods_project.targets.each do |target|
+    target.build_configurations.each do |config|
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
+    end
+  end
+end
+
+post_integrate do |installer|
+  grpc_source_headers = File.join(__dir__, 'Pods', 'gRPC-Core', 'include', 'grpc')
+  grpc_private_headers = File.join(__dir__, 'Pods', 'Headers', 'Private', 'grpc')
+  grpc_private_modulemap = File.join(grpc_private_headers, 'gRPC-Core.modulemap')
+  grpc_source_modulemap = File.join(grpc_source_headers, 'module.modulemap')
+
+  if Dir.exist?(grpc_source_headers)
+    FileUtils.mkdir_p(grpc_private_headers)
+
+    Dir.glob(File.join(grpc_source_headers, '**', '*'), File::FNM_DOTMATCH).each do |source_path|
+      next if File.directory?(source_path)
+
+      relative_path = source_path.delete_prefix("#{grpc_source_headers}/")
+      destination_path = File.join(grpc_private_headers, relative_path)
+      FileUtils.mkdir_p(File.dirname(destination_path))
+      next if File.exist?(destination_path) && File.identical?(source_path, destination_path)
+
+      FileUtils.cp(source_path, destination_path)
+    end
+
+    if File.exist?(grpc_source_modulemap)
+      unless File.exist?(grpc_private_modulemap) && File.identical?(grpc_source_modulemap, grpc_private_modulemap)
+        FileUtils.cp(grpc_source_modulemap, grpc_private_modulemap)
+      end
+    end
+  end
+
+  Dir.glob(File.join(__dir__, 'Pods', 'Target Support Files', '**', '*.xcconfig')).each do |xcconfig_path|
+    next unless File.file?(xcconfig_path)
+
+    xcconfig = File.read(xcconfig_path)
+    updated = xcconfig
+      .gsub(' -weak_framework "FirebaseFirestoreInternal"', '')
+      .gsub(' -weak_framework FirebaseFirestoreInternal', '')
+
+    if xcconfig_path.include?(File.join('Target Support Files', 'gRPC-Core', 'gRPC-Core.'))
+      updated = updated.gsub(
+        '"${PODS_ROOT}/Headers/Public/abseil"',
+        '"${PODS_ROOT}/Headers/Public/abseil" "${PODS_ROOT}/abseil"'
+      )
+    end
+
+    next if updated == xcconfig
+
+    File.write(xcconfig_path, updated)
+  end
+end

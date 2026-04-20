@@ -15,6 +15,7 @@ Important:
 - Review this before every release
 - Final answers must match the exact production build and SDKs included in that build
 - If you add analytics, ads, payments, social login profile fields, or additional tracking, this document must be updated again
+- This draft assumes Supabase is used for authentication and cloud backup or synchronization
 
 ## 1. Current Intended App Behavior
 
@@ -22,7 +23,7 @@ MoneyMa is expected to:
 
 - Allow users to create or use an account to sign in
 - Store financial records under a user account
-- Upload financial data to cloud services for backup and synchronization
+- Upload financial data to Supabase services for backup and synchronization
 - Restore and synchronize financial data across devices
 - Collect crash logs and diagnostics for app reliability and bug fixing
 - Allow user-initiated export, backup, restore, and sharing of files
@@ -145,7 +146,8 @@ This category should cover:
 Important:
 
 - Review the exact SDK documentation for your chosen providers
-- If using Firebase services, confirm whether Firebase Installation ID or other identifiers are processed in the production build
+- Confirm whether Supabase Auth, Supabase database or storage features, or your crash reporting provider generate service identifiers that must be declared
+- Confirm whether your production auth, crash reporting, or sync providers generate installation IDs or other service identifiers
 
 ## 4. Recommended Purpose Selections by Data Type
 
@@ -254,7 +256,7 @@ Choose only the purposes that truly apply to your implementation.
 
 Suggested short text:
 
-`MoneyMa collects account information such as email address and user ID to support login and account management. Financial records may be uploaded to cloud services to provide backup and synchronization across devices. Crash logs and diagnostics are collected to maintain app stability, troubleshoot errors, and improve reliability.`
+`MoneyMa collects account information such as email address and user ID to support login and account management. Financial records may be uploaded to Supabase services to provide backup and synchronization across devices. Crash logs and diagnostics are collected to maintain app stability, troubleshoot errors, and improve reliability.`
 
 ## 7. Privacy Policy Alignment Checklist
 
@@ -275,6 +277,7 @@ Before submission, confirm that your public privacy policy includes:
 - Confirm which auth provider is used in production
 - Confirm which cloud database or storage provider is used in production
 - Confirm which crash reporting SDK is included in production
+- If Supabase is used in production, confirm the exact Supabase products enabled for the release
 - Confirm all network traffic for collected data uses HTTPS/TLS
 - Confirm privacy policy URL is public and accessible without login
 - Confirm account deletion and cloud data deletion flow exists

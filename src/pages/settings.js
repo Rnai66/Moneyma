@@ -4,6 +4,8 @@ import {
   exportTransactionsToExcelBrowser,
   restoreLocalBackupFile,
 } from '../utils/dataTransfer';
+import { useAuth } from '../services/AuthContext';
+import { useSync } from '../services/useSync';
 
 function ToggleSwitch({ checked, onChange }) {
   return (
@@ -37,11 +39,14 @@ function SectionCard({ title, children }) {
   );
 }
 
-function Settings({ darkMode, onDarkModeChange, language, onLanguageChange, transactions, onDataRestored, t }) {
+function Settings({ darkMode, onDarkModeChange, language, onLanguageChange, transactions, onDataRestored, onRequireLogin, t, storageMode, setStorageMode }) {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [dbInfo, setDbInfo] = useState({ path: '', isCustom: false });
   const restoreInputRef = useRef(null);
+  
+  const { isAuthenticated, isPro, upgradeToPro } = useAuth();
+  const { syncStatus, manualSync, isSyncing } = useSync();
 
   // Load current DB path on mount
   React.useEffect(() => {
@@ -57,6 +62,29 @@ function Settings({ darkMode, onDarkModeChange, language, onLanguageChange, tran
     catch (e) { console.error(e); setMessage(t.error || e?.message || 'Error'); }
     finally { setLoading(false); }
   };
+
+  const handleUpgrade = () => run(async () => {
+    const res = await upgradeToPro();
+    if (res.success) {
+      setMessage('✅ Upgraded to Pro successfully!');
+    } else {
+      setMessage(res.error || 'Failed to upgrade');
+    }
+  });
+
+  const handleSync = () => run(async () => {
+    const mergedTransactions = await manualSync(transactions);
+    if (mergedTransactions) {
+      if (window.electronAPI && window.electronAPI.saveAllTransactions) {
+        await window.electronAPI.saveAllTransactions(mergedTransactions);
+      } else {
+        localStorage.setItem('webTransactions', JSON.stringify(mergedTransactions));
+      }
+      if (onDataRestored) {
+        await onDataRestored();
+      }
+    }
+  });
 
   const handleExport = () => run(async () => {
     if (window.electronAPI) {
@@ -190,6 +218,56 @@ function Settings({ darkMode, onDarkModeChange, language, onLanguageChange, tran
         </div>
       </SectionCard>
 
+      {/* Cloud Sync (Pro) */}
+      <SectionCard title={t.syncTitle || 'คลาวด์ซิงค์ / Cloud Sync'}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <div style={{ fontSize: '13px', color: 'var(--color-text-secondary)', marginBottom: '8px' }}>
+            {t.syncDesc || 'อัปโหลดและดาวน์โหลดข้อมูลธุรกรรมกับเซิร์ฟเวอร์'}
+          </div>
+          
+          {!isAuthenticated ? (
+            <div style={rowStyle}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: '600', fontSize: '14px', color: 'var(--color-text-primary)', marginBottom: '3px' }}>{t.syncRequiresPro || 'ฟีเจอร์นี้สงวนไว้สำหรับสมาชิกโปรเท่านั้น'}</div>
+              </div>
+              <button className="btn" onClick={onRequireLogin} style={{ flexShrink: 0 }}>
+                {t.loginToSync || 'เข้าสู่ระบบ'}
+              </button>
+            </div>
+          ) : !isPro ? (
+            <div style={rowStyle}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: '600', fontSize: '14px', color: 'var(--color-text-primary)', marginBottom: '3px' }}>{t.syncRequiresPro || 'ฟีเจอร์นี้สงวนไว้สำหรับสมาชิกโปรเท่านั้น'}</div>
+              </div>
+              <button className="btn" onClick={handleUpgrade} disabled={loading} style={{ flexShrink: 0 }}>
+                {loading ? t.loading : (t.upgradeToPro || 'อัปเกรดเป็น Pro')}
+              </button>
+            </div>
+          ) : (
+            <div style={rowStyle}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: '600', fontSize: '14px', color: 'var(--color-text-primary)' }}>
+                  {t.syncStatus || 'สถานะซิงค์'}: <span style={{ color: isSyncing ? 'var(--accent-primary)' : 'var(--color-text-secondary)' }}>{syncStatus?.status || 'idle'}</span>
+                </div>
+                {syncStatus?.lastSync && (
+                  <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '4px' }}>
+                    {new Date(syncStatus.lastSync).toLocaleString()}
+                  </div>
+                )}
+                {syncStatus?.message && (
+                  <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '4px' }}>
+                    {syncStatus.message}
+                  </div>
+                )}
+              </div>
+              <button className="btn" onClick={handleSync} disabled={isSyncing || loading} style={{ flexShrink: 0 }}>
+                {isSyncing ? t.loading : (t.syncNowBtn || 'ซิงค์ข้อมูล')}
+              </button>
+            </div>
+          )}
+        </div>
+      </SectionCard>
+
       {/* Export & Backup */}
       <SectionCard title={t.exportBackup}>
         <div style={{ display: 'grid', gap: '12px' }}>
@@ -214,6 +292,28 @@ function Settings({ darkMode, onDarkModeChange, language, onLanguageChange, tran
       {/* Database */}
       <SectionCard title={t.databaseSection}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          
+          <div style={rowStyle}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontWeight: '600', fontSize: '14px', color: 'var(--color-text-primary)', marginBottom: '3px' }}>
+                {t.useCloudStorage || 'Secure Cloud DB (Pro)'}
+              </div>
+              <div style={{ fontSize: '13px', color: 'var(--color-text-secondary)' }}>
+                {t.useCloudStorageDesc || 'Bypass local save and work directly on Supabase cloud.'}
+              </div>
+            </div>
+            <ToggleSwitch
+              checked={storageMode === 'cloud'}
+              onChange={(val) => {
+                if (!isAuthenticated || !isPro) {
+                  onRequireLogin();
+                  return;
+                }
+                setStorageMode(val ? 'cloud' : 'local');
+              }}
+            />
+          </div>
+
           {/* Current path display */}
           <div style={{ padding: '12px 16px', background: 'var(--bg-card-inner)', borderRadius: '10px', border: '1px solid var(--color-border)' }}>
             <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '6px' }}>

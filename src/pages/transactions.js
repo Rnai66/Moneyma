@@ -1,7 +1,12 @@
 import React, { useState, useMemo } from 'react';
+import { createPortal } from 'react-dom';
+import SupabaseService from '../services/SupabaseService';
+import { useAuth } from '../services/AuthContext';
+import ScanSlip from '../components/ScanSlip';
+import ScanBill from '../components/ScanBill';
+
 
 const WEB_TRANSACTIONS_KEY = 'webTransactions';
-
 function readWebTransactions() {
   try {
     return JSON.parse(localStorage.getItem(WEB_TRANSACTIONS_KEY) || '[]');
@@ -15,12 +20,28 @@ function writeWebTransactions(items) {
   localStorage.setItem(WEB_TRANSACTIONS_KEY, JSON.stringify(items));
 }
 
-function Transactions({ transactions, onRefresh, t }) {
+function generateUUID() {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : ((r & 0x3) | 0x8);
+    return v.toString(16);
+  });
+}
+
+function Transactions({ transactions, onRefresh, t, storageMode }) {
+  const { user } = useAuth();
   const [showForm, setShowForm] = useState(false);
+  const [showScanSlip, setShowScanSlip] = useState(false);
+  const [showScanBill, setShowScanBill] = useState(false);
   const [loading, setLoading] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState('success');
+  const [viewMode, setViewMode] = useState('cards'); // 'cards' | 'table'
+  const [inlineEdit, setInlineEdit] = useState(null); // { id, field, value }
   const [formData, setFormData] = useState({
     type: 'expense', amount: '', category: '', description: '',
     date: new Date().toISOString().split('T')[0],
@@ -53,7 +74,9 @@ function Transactions({ transactions, onRefresh, t }) {
 
   const resetForm = () => {
     setFormData({ type: 'expense', amount: '', category: '', description: '', date: new Date().toISOString().split('T')[0] });
-    setEditingId(null); setShowForm(false);
+    setEditingId(null);
+    setShowForm(false);
+    document.body.style.overflow = '';
   };
 
   const setStatus = (type, text) => {
@@ -63,7 +86,61 @@ function Transactions({ transactions, onRefresh, t }) {
 
   const handleEdit = (tx) => {
     setFormData({ type: tx.type, amount: tx.amount.toString(), category: tx.category, description: tx.description || '', date: tx.date });
-    setEditingId(tx.id); setShowForm(true);
+    setEditingId(tx.id);
+    setShowForm(true);
+    // Prevent body scroll when modal is open
+    document.body.style.overflow = 'hidden';
+  };
+
+  const handleNewTransaction = () => {
+    resetForm();
+    setShowForm(true);
+    document.body.style.overflow = 'hidden';
+  };
+
+  const handleScanTransactions = async (newTxs) => {
+    try {
+      setLoading(true);
+      setMessage('');
+
+      const itemsToSave = newTxs.map(tx => {
+        const amt = parseFloat(tx.amount) || 0;
+        if (!Number.isFinite(amt) || amt <= 0) {
+          throw new Error(t.invalidAmount || 'Invalid amount');
+        }
+        return {
+          type: tx.type || 'expense',
+          amount: amt,
+          category: tx.category || 'Other',
+          description: tx.note || tx.description || '',
+          date: tx.date || new Date().toISOString().split('T')[0],
+        };
+      });
+
+      if (storageMode === 'cloud' && user) {
+        for (const tx of itemsToSave) {
+          await SupabaseService.addTransaction(user.id, { ...tx, id: generateUUID() });
+        }
+      } else if (window.electronAPI) {
+        for (const tx of itemsToSave) {
+          await window.electronAPI.addTransaction(tx);
+        }
+      } else {
+        const items = readWebTransactions();
+        const txsWithId = itemsToSave.map(tx => ({ ...tx, id: generateUUID() }));
+        writeWebTransactions([...txsWithId, ...items]);
+      }
+
+      await onRefresh();
+      setStatus('success', t.saveSuccess || 'Transactions saved');
+    } catch (err) {
+      console.error(err);
+      setStatus('error', `${t.saveFailed || 'Save failed'}${err?.message ? `: ${err.message}` : ''}`);
+    } finally {
+      setLoading(false);
+      setShowScanSlip(false);
+      setShowScanBill(false);
+    }
   };
 
   const handleDelete = async (id) => {
@@ -71,7 +148,9 @@ function Transactions({ transactions, onRefresh, t }) {
       try {
         setLoading(true);
         setMessage('');
-        if (window.electronAPI) {
+        if (storageMode === 'cloud' && user) {
+          await SupabaseService.deleteTransaction(user.id, id);
+        } else if (window.electronAPI) {
           await window.electronAPI.deleteTransaction(id);
         } else {
           writeWebTransactions(readWebTransactions().filter(tx => tx.id !== id));
@@ -86,6 +165,145 @@ function Transactions({ transactions, onRefresh, t }) {
     }
   };
 
+  // ─── Inline cell save ─────────────────────────────────────────────────────
+  const handleInlineSave = async (tx) => {
+    if (!inlineEdit || inlineEdit.id !== tx.id) return;
+    const updatedTx = { ...tx, [inlineEdit.field]: inlineEdit.value };
+    // Reuse handleSubmit logic inline
+    try {
+      setLoading(true);
+      const data = { ...updatedTx, amount: parseFloat(updatedTx.amount) };
+      if (!Number.isFinite(data.amount) || data.amount <= 0) throw new Error(t.invalidAmount);
+      if (storageMode === 'cloud' && user) {
+        await SupabaseService.updateTransaction(user.id, tx.id, data);
+      } else if (window.electronAPI) {
+        await window.electronAPI.updateTransaction(tx.id, data);
+      } else {
+        writeWebTransactions(readWebTransactions().map(r => r.id === tx.id ? { ...r, ...data } : r));
+      }
+      setInlineEdit(null);
+      await onRefresh();
+      setStatus('success', t.updateSuccess);
+    } catch (err) {
+      setStatus('error', `${t.saveFailed}: ${err?.message || ''}`);
+    } finally { setLoading(false); }
+  };
+
+  const handleInlineChange = (id, field, value) => setInlineEdit({ id, field, value });
+  const handleInlineKeyDown = (e, tx) => {
+    if (e.key === 'Enter') handleInlineSave(tx);
+    if (e.key === 'Escape') setInlineEdit(null);
+  };
+
+  // ─── Table view renderer ──────────────────────────────────────────────────
+  const renderTableView = () => (
+    <div style={{ overflowX: 'auto' }}>
+      <table style={{
+        width: '100%', borderCollapse: 'collapse',
+        fontSize: '13.5px', lineHeight: '1.4',
+      }}>
+        <thead>
+          <tr style={{ background: 'var(--bg-card-inner)', borderBottom: '2px solid var(--color-border)' }}>
+            {[t.thDate || 'Date', t.thType || 'Type', t.thCategory || 'Category', t.thDescription || 'Description', t.thAmount || 'Amount', ''].map((h, i) => (
+              <th key={h || i} style={{
+                padding: '10px 12px', textAlign: 'left', color: 'var(--color-text-secondary)',
+                fontWeight: '600', whiteSpace: 'nowrap',
+              }}>{h}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {filteredTransactions.length === 0 ? (
+            <tr><td colSpan={6} style={{ padding: '40px', textAlign: 'center', color: 'var(--color-text-secondary)' }}>
+              {t.noResults}
+            </td></tr>
+          ) : filteredTransactions.map(tx => {
+            const isEditRow = inlineEdit?.id === tx.id;
+            const cellStyle = {
+              padding: '9px 12px', borderBottom: '1px solid var(--color-border)',
+              verticalAlign: 'middle', background: isEditRow ? 'var(--bg-card-inner)' : undefined,
+            };
+            const inputCell = (field, type = 'text') => {
+              const val = isEditRow && inlineEdit.field === field ? inlineEdit.value : tx[field] ?? '';
+              const isActive = isEditRow && inlineEdit.field === field;
+              return (
+                <input
+                  type={type}
+                  value={val}
+                  readOnly={!isEditRow}
+                  onClick={() => !isEditRow && handleInlineChange(tx.id, field, tx[field] ?? '')}
+                  onChange={e => handleInlineChange(tx.id, field, e.target.value)}
+                  onKeyDown={e => handleInlineKeyDown(e, tx)}
+                  style={{
+                    background: isActive ? 'var(--bg-input)' : 'transparent',
+                    border: isActive ? '1.5px solid var(--color-accent)' : '1.5px solid transparent',
+                    borderRadius: '6px', padding: '4px 7px', fontSize: '13px',
+                    color: 'var(--color-text-primary)', fontFamily: 'inherit',
+                    width: '100%', boxSizing: 'border-box', cursor: isEditRow ? 'text' : 'pointer',
+                    outline: 'none',
+                  }}
+                />
+              );
+            };
+            return (
+              <tr key={tx.id} style={{ transition: 'background 0.1s' }}
+                onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-card-inner)'}
+                onMouseLeave={e => e.currentTarget.style.background = ''}
+              >
+                <td style={cellStyle}>{inputCell('date', 'date')}</td>
+                <td style={cellStyle}>
+                  {isEditRow && inlineEdit.field === 'type' ? (
+                    <select
+                      value={inlineEdit.value}
+                      onChange={e => handleInlineChange(tx.id, 'type', e.target.value)}
+                      onKeyDown={e => handleInlineKeyDown(e, tx)}
+                      style={{ fontFamily: 'inherit', fontSize: '13px', padding: '4px 6px', borderRadius: '6px', border: '1.5px solid var(--color-accent)', background: 'var(--bg-input)', color: 'var(--color-text-primary)' }}
+                    >
+                      <option value="income">{t.income}</option>
+                      <option value="expense">{t.expense}</option>
+                    </select>
+                  ) : (
+                    <span
+                      onClick={() => handleInlineChange(tx.id, 'type', tx.type)}
+                      className={`type-badge ${tx.type}`}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      {tx.type === 'income' ? `↑ ${t.income}` : `↓ ${t.expense}`}
+                    </span>
+                  )}
+                </td>
+                <td style={cellStyle}>{inputCell('category')}</td>
+                <td style={cellStyle}>{inputCell('description')}</td>
+                <td style={{ ...cellStyle, fontWeight: '600', color: tx.type === 'income' ? 'var(--color-success)' : 'var(--color-danger)', whiteSpace: 'nowrap' }}>
+                  {isEditRow && inlineEdit.field === 'amount' ? inputCell('amount', 'number') : (
+                    <span onClick={() => handleInlineChange(tx.id, 'amount', tx.amount)} style={{ cursor: 'pointer' }}>
+                      {tx.type === 'income' ? '+' : '−'} {formatCurrency(tx.amount)}
+                    </span>
+                  )}
+                </td>
+                <td style={{ ...cellStyle, whiteSpace: 'nowrap' }}>
+                  {isEditRow ? (
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <button className="btn" disabled={loading} style={{ padding: '4px 10px', fontSize: '12px', minHeight: '28px' }}
+                        onClick={() => handleInlineSave(tx)}>{t.save || 'Save'} ✓</button>
+                      <button className="btn btn-ghost" style={{ padding: '4px 8px', fontSize: '12px', minHeight: '28px' }}
+                        onClick={() => setInlineEdit(null)}>{t.cancel || 'Cancel'}</button>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', gap: '4px' }}>
+                      <button title={t.edit} onClick={() => handleEdit(tx)} disabled={loading} className="icon-btn">✏️</button>
+                      <button title={t.delete} onClick={() => handleDelete(tx.id)} disabled={loading} className="icon-btn danger">🗑️</button>
+                    </div>
+                  )}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
@@ -96,7 +314,10 @@ function Transactions({ transactions, onRefresh, t }) {
         throw new Error(t.invalidAmount);
       }
 
-      if (window.electronAPI) {
+      if (storageMode === 'cloud' && user) {
+        if (editingId) { await SupabaseService.updateTransaction(user.id, editingId, data); }
+        else { await SupabaseService.addTransaction(user.id, { ...data, id: generateUUID() }); }
+      } else if (window.electronAPI) {
         if (editingId) { await window.electronAPI.updateTransaction(editingId, data); }
         else { await window.electronAPI.addTransaction(data); }
       } else {
@@ -104,7 +325,7 @@ function Transactions({ transactions, onRefresh, t }) {
         if (editingId) {
           writeWebTransactions(items.map(tx => tx.id === editingId ? { ...tx, ...data, id: editingId } : tx));
         } else {
-          writeWebTransactions([{ ...data, id: Date.now() }, ...items]);
+          writeWebTransactions([{ ...data, id: generateUUID() }, ...items]);
         }
       }
       resetForm();
@@ -155,9 +376,48 @@ function Transactions({ transactions, onRefresh, t }) {
           <h1>{t.transactionsTitle}</h1>
           <p>{t.totalRecords.replace('{n}', transactions?.length || 0)}</p>
         </div>
-        <button className="btn" onClick={() => setShowForm(!showForm)} disabled={loading}>
-          {showForm ? `✕ ${t.cancel}` : t.newTransaction}
-        </button>
+        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
+          {/* View toggle */}
+          <div style={{ display: 'flex', border: '1.5px solid var(--color-border)', borderRadius: '8px', overflow: 'hidden' }}>
+            <button
+              onClick={() => setViewMode('cards')}
+              style={{
+                padding: '6px 12px', fontSize: '13px', fontWeight: '600', border: 'none', cursor: 'pointer',
+                background: viewMode === 'cards' ? 'var(--color-accent, #3b82f6)' : 'transparent',
+                color: viewMode === 'cards' ? '#fff' : 'var(--color-text-secondary)',
+                transition: 'all 0.15s',
+              }}
+            >☰ {t.viewCards || 'Cards'}</button>
+            <button
+              onClick={() => { setViewMode('table'); setInlineEdit(null); }}
+              style={{
+                padding: '6px 12px', fontSize: '13px', fontWeight: '600', border: 'none', cursor: 'pointer',
+                background: viewMode === 'table' ? 'var(--color-accent, #3b82f6)' : 'transparent',
+                color: viewMode === 'table' ? '#fff' : 'var(--color-text-secondary)',
+                transition: 'all 0.15s',
+              }}
+            >⊞ {t.viewTable || 'Table'}</button>
+          </div>
+          <button
+            className="btn scan-slip-btn"
+            onClick={() => setShowScanSlip(true)}
+            disabled={loading}
+            style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+          >
+            📷 {t.scanSlip || 'Scan Slip'}
+          </button>
+          <button
+            className="btn scan-bill-btn"
+            onClick={() => setShowScanBill(true)}
+            disabled={loading}
+            style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+          >
+            🧾 {t.scanBill || 'Scan Bill'}
+          </button>
+          <button className="btn" onClick={handleNewTransaction} disabled={loading}>
+            {t.newTransaction}
+          </button>
+        </div>
       </div>
 
       <div className="metrics-strip">
@@ -189,49 +449,103 @@ function Transactions({ transactions, onRefresh, t }) {
         {t.storageMode}: {window.electronAPI ? t.storageDesktop : t.storageBrowser}
       </div>
 
-      {showForm && (
-        <div className="card glass-card" style={{ padding: '24px' }}>
-          <h3 style={{ margin: '0 0 20px', fontWeight: '700', fontSize: '16px', color: 'var(--color-text-primary)', letterSpacing: '-0.02em' }}>
-            {editingId ? t.editTransaction : t.newTransaction}
-          </h3>
-          <form onSubmit={handleSubmit} style={{ display: 'grid', gap: '16px' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px' }}>
-              <div className="filter-group">
-                <label>{t.formType}</label>
-                <select value={formData.type} onChange={e => setFormData({ ...formData, type: e.target.value })} disabled={loading} style={inputStyle}>
-                  <option value="income">{t.income}</option>
-                  <option value="expense">{t.expense}</option>
-                </select>
-              </div>
-              <div className="filter-group">
-                <label>{t.formAmount}</label>
-                <input type="number" step="0.01" placeholder="0.00" value={formData.amount} onChange={e => setFormData({ ...formData, amount: e.target.value })} disabled={loading} required style={inputStyle} />
-              </div>
-              <div className="filter-group">
-                <label>{t.formCategory}</label>
-                <input type="text" placeholder={t.formCategoryPlaceholder} value={formData.category} onChange={e => setFormData({ ...formData, category: e.target.value })} disabled={loading} required style={inputStyle} />
-              </div>
-              <div className="filter-group">
-                <label>{t.formDate}</label>
-                <input type="date" value={formData.date} onChange={e => setFormData({ ...formData, date: e.target.value })} disabled={loading} required style={inputStyle} />
-              </div>
+      {/* Scan Slip Modal */}
+      {showScanSlip && (
+        <ScanSlip
+          t={t}
+          onClose={() => setShowScanSlip(false)}
+          onTransactionCreate={handleScanTransactions}
+        />
+      )}
+      {/* Scan Bill Modal */}
+      {showScanBill && (
+        <ScanBill
+          t={t}
+          onTransactionCreate={handleScanTransactions}
+          onClose={() => setShowScanBill(false)}
+        />
+      )}
+      {/* Bottom-sheet modal for add/edit */}
+      {showForm && createPortal(
+        <>
+          {/* Backdrop */}
+          <div
+            onClick={resetForm}
+            style={{
+              position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
+              zIndex: 9999, backdropFilter: 'blur(2px)',
+            }}
+          />
+          {/* Sheet */}
+          <div style={{
+            position: 'fixed', left: 0, right: 0, bottom: 0,
+            background: 'var(--bg-card)',
+            borderRadius: '20px 20px 0 0',
+            boxShadow: '0 -8px 40px rgba(0,0,0,0.3)',
+            zIndex: 10000,
+            padding: '24px 24px 40px',
+            maxHeight: '90dvh',
+            maxWidth: '600px',
+            margin: '0 auto',
+            overflowY: 'auto',
+            animation: 'slideUp 0.25s ease',
+          }}>
+            {/* Drag handle */}
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
+              <div style={{ width: '40px', height: '4px', borderRadius: '2px', background: 'var(--color-border)' }} />
             </div>
-            <div className="filter-group">
-              <label>{t.formDescription}</label>
-              <input type="text" placeholder={t.formDescPlaceholder} value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} disabled={loading} style={inputStyle} />
-            </div>
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <button type="submit" className="btn" disabled={loading}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '0 0 24px' }}>
+              <h3 style={{ margin: 0, fontWeight: '700', fontSize: '18px', color: 'var(--color-text-primary)', letterSpacing: '-0.02em' }}>
+                {editingId ? t.editTransaction : t.newTransaction}
+              </h3>
+              <button
+                type="submit"
+                form="transaction-form"
+                className="btn"
+                disabled={loading}
+                style={{ padding: '8px 16px', fontSize: '14px', minHeight: '36px', minWidth: '90px' }}
+              >
                 {loading ? t.saving : editingId ? t.updateBtn : t.addTransactionBtn}
               </button>
-              {editingId && (
-                <button type="button" className="btn btn-ghost" onClick={resetForm} disabled={loading}>
-                  {t.cancelEdit}
-                </button>
-              )}
             </div>
-          </form>
-        </div>
+            <form id="transaction-form" onSubmit={handleSubmit} style={{ display: 'grid', gap: '20px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px' }}>
+                <div className="filter-group">
+                  <label>{t.formType}</label>
+                  <select value={formData.type} onChange={e => setFormData({ ...formData, type: e.target.value })} disabled={loading} style={inputStyle}>
+                    <option value="income">{t.income}</option>
+                    <option value="expense">{t.expense}</option>
+                  </select>
+                </div>
+                <div className="filter-group">
+                  <label>{t.formAmount}</label>
+                  <input type="number" step="0.01" placeholder="0.00" value={formData.amount} onChange={e => setFormData({ ...formData, amount: e.target.value })} disabled={loading} required style={inputStyle} />
+                </div>
+                <div className="filter-group">
+                  <label>{t.formCategory}</label>
+                  <input type="text" placeholder={t.formCategoryPlaceholder} value={formData.category} onChange={e => setFormData({ ...formData, category: e.target.value })} disabled={loading} required style={inputStyle} />
+                </div>
+                <div className="filter-group">
+                  <label>{t.formDate}</label>
+                  <input type="date" value={formData.date} onChange={e => setFormData({ ...formData, date: e.target.value })} disabled={loading} required style={inputStyle} />
+                </div>
+              </div>
+              <div className="filter-group">
+                <label>{t.formDescription}</label>
+                <input type="text" placeholder={t.formDescPlaceholder} value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} disabled={loading} style={inputStyle} />
+              </div>
+              <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
+                <button type="submit" className="btn" disabled={loading} style={{ flex: 1, padding: '14px' }}>
+                  {loading ? t.saving : editingId ? t.updateBtn : t.addTransactionBtn}
+                </button>
+                <button type="button" className="btn btn-ghost" onClick={resetForm} disabled={loading} style={{ padding: '14px' }}>
+                  {t.cancel}
+                </button>
+              </div>
+            </form>
+          </div>
+        </>,
+        document.body
       )}
 
       <div className="card glass-card" style={{ padding: '20px' }}>
@@ -278,7 +592,11 @@ function Transactions({ transactions, onRefresh, t }) {
       </div>
 
       <div className="transactions-list">
-        {filteredTransactions.length > 0 ? (
+        {viewMode === 'table' ? (
+          <div className="card glass-card" style={{ padding: '0' }}>
+            {renderTableView()}
+          </div>
+        ) : filteredTransactions.length > 0 ? (
           <div className="transaction-feed">
             {sortedGroupedTransactions.map(([date, items]) => (
               <section key={date} className="transaction-group">
@@ -312,22 +630,8 @@ function Transactions({ transactions, onRefresh, t }) {
                         </strong>
                       </div>
                       <div className="transaction-card-actions">
-                        <button
-                          title={t.edit}
-                          onClick={() => handleEdit(tx)}
-                          disabled={loading}
-                          className="icon-btn"
-                        >
-                          ✏️
-                        </button>
-                        <button
-                          title={t.delete}
-                          onClick={() => handleDelete(tx.id)}
-                          disabled={loading}
-                          className="icon-btn danger"
-                        >
-                          🗑️
-                        </button>
+                        <button title={t.edit} onClick={() => handleEdit(tx)} disabled={loading} className="icon-btn">✏️</button>
+                        <button title={t.delete} onClick={() => handleDelete(tx.id)} disabled={loading} className="icon-btn danger">🗑️</button>
                       </div>
                     </article>
                   ))}

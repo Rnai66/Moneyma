@@ -32,7 +32,7 @@ Depending on how you use MoneyMa, we may collect and process the following categ
 
 ### D. Backup and Sync Data
 
-When cloud backup or synchronization is enabled, the financial and preference data associated with your account may be uploaded to and stored on our cloud infrastructure so it can be backed up and synchronized across devices.
+When cloud backup or synchronization is enabled, the financial and preference data associated with your account may be uploaded to and stored using Supabase services so it can be backed up and synchronized across devices.
 
 ### E. Crash Logs and Diagnostics
 
@@ -77,7 +77,7 @@ We may share information only in the following limited situations:
 - When required by law, regulation, legal process, or valid government request
 - To protect the rights, safety, security, or property of users, MoneyMa, or the public
 
-If third-party infrastructure providers are used, they may process data on our behalf under their own security and processing terms.
+MoneyMa uses Supabase for account authentication and cloud data synchronization. If other third-party infrastructure providers are used, such as a crash reporting provider, they may process data on our behalf under their own security and processing terms.
 
 ## 5. Crash Reporting and Diagnostics
 
@@ -97,7 +97,7 @@ We use this information only for debugging, maintenance, reliability, and servic
 
 If you sign in and use cloud backup or sync features:
 
-- Your financial records and related app data may be transmitted to our servers or trusted cloud providers
+- Your financial records and related app data may be transmitted to Supabase-managed infrastructure used for MoneyMa account and sync services
 - Data may be synchronized between devices associated with your account
 - Data may be restored after reinstalling the app or signing in on another supported device
 
@@ -113,6 +113,8 @@ When you create or use an account, we may process account-related data to:
 - Support account recovery, security, and service continuity
 
 If you contact support, we may also use your account identifier or email address to help resolve account-related issues.
+
+MoneyMa uses Supabase Auth to support sign-in, session handling, and account-linked data access.
 
 ## 8. Data Retention
 
@@ -163,7 +165,7 @@ If you believe a child has provided personal information through the app, contac
 
 ## 12. International Data Transfers
 
-If our cloud providers, hosting providers, authentication systems, or crash reporting services operate in different countries, your information may be processed or stored outside your country of residence.
+If Supabase or any other cloud, hosting, authentication, or crash reporting services used by MoneyMa operate in different countries, your information may be processed or stored outside your country of residence.
 
 Where applicable, we will rely on reasonable safeguards appropriate to the services used.
 

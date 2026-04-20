@@ -125,6 +125,12 @@ class JsonDatabaseService {
     return this.data.transactions.find(tx => Number(tx.id) === Number(id)) || null;
   }
 
+  async saveAllTransactions(transactions) {
+    this.data.transactions = [...transactions];
+    this.persist();
+    return { success: true, count: transactions.length };
+  }
+
   async getSummary() {
     return this.data.transactions.reduce((acc, tx) => {
       if (tx.type === 'income') acc.totalIncome += Number(tx.amount) || 0;

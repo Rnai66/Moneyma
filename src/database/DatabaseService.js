@@ -1,6 +1,7 @@
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 const { app } = require('electron');
+const crypto = require('crypto');
 
 class DatabaseService {
   constructor(customPath = null) {
@@ -29,7 +30,7 @@ class DatabaseService {
   createTables() {
     const createTransactionsTable = `
       CREATE TABLE IF NOT EXISTS transactions (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id TEXT PRIMARY KEY,
         type TEXT NOT NULL CHECK(type IN ('income', 'expense')),
         amount REAL NOT NULL,
         category TEXT NOT NULL,
@@ -65,6 +66,28 @@ class DatabaseService {
     this.db.serialize(() => {
       this.db.run(createTransactionsTable, (err) => {
         if (err) console.error('Error creating transactions table:', err);
+      });
+
+      // Migrate transactions table if ID is INTEGER
+      this.db.all("PRAGMA table_info(transactions)", (err, columns) => {
+        if (!err && columns && columns.length > 0) {
+          const idCol = columns.find(c => c.name === 'id');
+          if (idCol && idCol.type === 'INTEGER') {
+            console.log('Migrating transactions table to use TEXT UUID primary keys...');
+            const createNewTableSQL = "CREATE TABLE IF NOT EXISTS transactions_new (id TEXT PRIMARY KEY, type TEXT NOT NULL CHECK(type IN ('income', 'expense')), amount REAL NOT NULL, category TEXT NOT NULL, description TEXT, date TEXT NOT NULL, createdAt DATETIME DEFAULT CURRENT_TIMESTAMP, updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP)";
+            this.db.run(createNewTableSQL, (err) => {
+               if (!err) {
+                 this.db.run('INSERT INTO transactions_new SELECT CAST(id AS TEXT), type, amount, category, description, date, createdAt, updatedAt FROM transactions', (err) => {
+                   if (!err) {
+                     this.db.run('DROP TABLE transactions');
+                     this.db.run('ALTER TABLE transactions_new RENAME TO transactions');
+                     console.log('Successfully migrated transactions');
+                   }
+                 });
+               }
+            });
+          }
+        }
       });
 
       this.db.run(createCategoriesTable, (err) => {
@@ -171,18 +194,20 @@ class DatabaseService {
 
   addTransaction(transaction) {
     return new Promise((resolve, reject) => {
+      const uuid = crypto.randomUUID();
       this.db.run(
-        'INSERT INTO transactions (type, amount, category, description, date) VALUES (?, ?, ?, ?, ?)',
+        'INSERT INTO transactions (id, type, amount, category, description, date) VALUES (?, ?, ?, ?, ?, ?)',
         [
+          uuid,
           transaction.type,
           transaction.amount,
           transaction.category,
           transaction.description || '',
           transaction.date
         ],
-        function (err) {
+        (err) => {
           if (err) reject(err);
-          else resolve({ id: this.lastID, ...transaction });
+          else resolve({ id: uuid, ...transaction });
         }
       );
     });
@@ -222,6 +247,34 @@ class DatabaseService {
       this.db.get('SELECT * FROM transactions WHERE id = ?', [id], (err, row) => {
         if (err) reject(err);
         else resolve(row);
+      });
+    });
+  }
+
+  saveAllTransactions(transactions) {
+    return new Promise((resolve, reject) => {
+      this.db.serialize(() => {
+        this.db.run('BEGIN TRANSACTION');
+        const stmt = this.db.prepare(
+          'INSERT OR REPLACE INTO transactions (id, type, amount, category, description, date, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+        );
+        transactions.forEach((tx) => {
+          stmt.run(
+            tx.id,
+            tx.type,
+            tx.amount,
+            tx.category,
+            tx.description || '',
+            tx.date,
+            tx.createdAt || tx.created_at || new Date().toISOString(),
+            tx.updated_at || tx.updatedAt || new Date().toISOString()
+          );
+        });
+        stmt.finalize();
+        this.db.run('COMMIT', (err) => {
+          if (err) reject(err);
+          else resolve({ success: true, count: transactions.length });
+        });
       });
     });
   }
