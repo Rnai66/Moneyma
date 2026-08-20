@@ -10,6 +10,7 @@ __pycache__/
 .env.*.local
 .firebaserc
 android/app/google-services.json
+*.jks
 android/app/*.keystore
 android/app/*.jks
 android/keystore.properties
@@ -25,3 +26,13 @@ docs/index.html
 
 # Local Netlify folder
 .netlify
+build-verify/
+.idea/
+.gradle-user/
+pfm-upload-cert.pem
+_to_delete/
+apk_inspect/
+apk_inspect2/
+cert_extract/
+supabase/.temp/
+

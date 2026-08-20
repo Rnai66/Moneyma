@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback } from 'react';
+import { tr } from '../i18n/lang';
 import { scanSingleFile, batchScanFiles, normalizeSlipToTransaction } from '../services/AutoScanService';
 
 /**
@@ -46,7 +47,7 @@ export function useSlipScan() {
         const { slip, isDuplicate } = await scanSingleFile(file);
 
         if (!slip.is_slip) {
-          setError('ไม่พบข้อมูลสลิปในรูปนี้ กรุณาลองใหม่');
+          setError(tr().scanNoSlip);
           setStatus('error');
           return null;
         }
@@ -57,7 +58,7 @@ export function useSlipScan() {
         setStatus('result');
         return result;
       } catch (err) {
-        setError(err.message || 'เกิดข้อผิดพลาด กรุณาลองใหม่');
+        setError(err.message || tr().scanGenericError);
         setStatus('error');
         return null;
       }
@@ -88,7 +89,7 @@ export function useSlipScan() {
       return results;
     } catch (err) {
       if (err.name !== 'AbortError') {
-        setError(err.message || 'เกิดข้อผิดพลาดระหว่าง Auto-scan');
+        setError(err.message || tr().autoScanError);
         setStatus('error');
       }
       return [];

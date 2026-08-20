@@ -1,62 +1,51 @@
 {
   "name": "monyema",
-  "version": "1.4.0",
+  "version": "2.3.0",
   "description": "MoneyMa - จัดการการเงินส่วนตัว",
-  "main": "public/electron.js",
   "homepage": "./",
   "author": "Your Name",
   "license": "MIT",
   "scripts": {
     "start": "react-scripts start",
-    "build": "react-scripts build",
+    "build": "REACT_APP_VERSION=$npm_package_version react-scripts build",
+    "build:mobile": "REACT_APP_VERSION=$npm_package_version REACT_APP_MOBILE_BUILD=true GENERATE_SOURCEMAP=false react-scripts build && node scripts/strip-web-only-assets.js",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
-    "electron": "electron .",
-    "dev": "concurrently \"npm start\" \"wait-on http://localhost:3000 && npm run electron\"",
-    "build-app": "npm run build && electron-builder",
-    "build-mac": "npm run build && electron-builder --mac",
-    "build-android": "npm run build && npx cap sync android",
+    "build-android": "npm run build:mobile && npx cap sync android",
+    "sync-android": "npm run build:mobile && npx cap copy android",
     "build-android-release": "npm run build && cd android && ./gradlew assembleRelease",
-    "build-ios": "npm run build && npx cap sync ios",
+    "build-ios": "npm run build:mobile && npx cap sync ios",
     "build-ios-debug-sim": "xcodebuild -workspace ios/App/App.xcworkspace -scheme App -configuration Debug -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 17' -derivedDataPath /tmp/pfm-ios-debug-sim build",
-    "build-ios-release": "npm run build && npx cap sync ios && xcodebuild -workspace ios/App/App.xcworkspace -scheme App -configuration Release -sdk iphoneos -derivedDataPath /tmp/pfm-ios-release-sign build",
-    "archive-ios": "npm run build && npx cap sync ios && xcodebuild -workspace ios/App/App.xcworkspace -scheme App -configuration Release -sdk iphoneos -archivePath /tmp/pfm-ios-archives/MoneyMa.xcarchive archive",
+    "build-ios-release": "npm run build:mobile && npx cap sync ios && xcodebuild -workspace ios/App/App.xcworkspace -scheme App -configuration Release -sdk iphoneos -allowProvisioningUpdates -derivedDataPath /tmp/pfm-ios-release-sign build",
+    "archive-ios": "npm run build:mobile && npx cap sync ios && xcodebuild -workspace ios/App/App.xcworkspace -scheme App -configuration Release -sdk iphoneos -allowProvisioningUpdates -archivePath /tmp/pfm-ios-archives/MoneyMa.xcarchive archive",
     "export-ios-appstore": "xcodebuild -exportArchive -archivePath /tmp/pfm-ios-archives/MoneyMa.xcarchive -exportPath /tmp/pfm-ios-exports/app-store -exportOptionsPlist ios/App/ExportOptions/AppStore.plist",
     "export-ios-development": "xcodebuild -exportArchive -archivePath /tmp/pfm-ios-archives/MoneyMa.xcarchive -exportPath /tmp/pfm-ios-exports/development -exportOptionsPlist ios/App/ExportOptions/Development.plist",
     "distribute-android": "firebase appdistribution:distribute android/app/build/outputs/apk/release/app-release.apk --app 1:YOUR_PROJECT_NUMBER:android:YOUR_APP_ID --tester-groups testers --release-notes \"Release Build\"",
     "distribute-ios": "firebase appdistribution:distribute build/ios/ipa/App.ipa --app 1:YOUR_PROJECT_NUMBER:ios:YOUR_APP_ID --tester-groups testers --release-notes \"Release Build\""
   },
   "dependencies": {
-    "@capacitor/android": "^8.2.0",
+    "@capacitor/android": "^8.3.4",
     "@capacitor/app": "^8.1.0",
-    "@capacitor/camera": "^8.1.0",
-    "@capacitor/cli": "^8.2.0",
-    "@capacitor/core": "^8.2.0",
+    "@capacitor/camera": "^8.2.0",
+    "@capacitor/cli": "^8.3.4",
+    "@capacitor/core": "^8.3.4",
     "@capacitor/filesystem": "^8.1.2",
-    "@capacitor/ios": "^8.2.0",
+    "@capacitor/ios": "^8.3.4",
     "@capacitor/share": "^8.0.1",
-    "@revenuecat/purchases-capacitor": "^12.3.0",
-    "@supabase/supabase-js": "^2.99.3",
-    "axios": "^1.6.0",
+    "@revenuecat/purchases-capacitor": "^13.1.2",
+    "@supabase/supabase-js": "^2.106.1",
+    "axios": "^1.16.1",
     "chart.js": "^4.4.0",
-    "electron-serve": "^1.1.0",
-    "firebase": "^10.7.0",
-    "pdfkit": "^0.13.0",
+    "firebase": "^12.13.0",
     "react": "^18.2.0",
     "react-chartjs-2": "^5.2.0",
     "react-dom": "^18.2.0",
-    "react-icons": "^4.11.0",
+    "react-icons": "^5.6.0",
     "recharts": "^3.8.0",
-    "setuptools": "^0.0.1",
-    "sqlite3": "^5.1.7",
-    "xlsx": "^0.18.5"
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },
   "devDependencies": {
-    "concurrently": "^8.2.1",
-    "electron": "^27.0.0",
-    "electron-builder": "^24.6.4",
-    "react-scripts": "5.0.1",
-    "wait-on": "^7.0.1"
+    "react-scripts": "5.0.1"
   },
   "eslintConfig": {
     "extends": [
@@ -74,38 +63,5 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
-  },
-  "build": {
-    "appId": "com.finance.manager",
-    "productName": "MoneyMa",
-    "files": [
-      "build/**/*",
-      "node_modules/**/*",
-      "public/electron.js",
-      "public/preload.js",
-      "src/database/**/*",
-      "package.json",
-      "!node_modules/sqlite3/build/{**/*}",
-      "!node_modules/sqlite3/deps/{**/*}",
-      "!node_modules/sqlite3/src/{**/*}"
-    ],
-    "extraResources": [
-      {
-        "from": "node_modules/sqlite3",
-        "to": "app.asar.unpacked/node_modules/sqlite3",
-        "filter": [
-          "lib/**/*",
-          "package.json",
-          "build/Release/node_sqlite3.node"
-        ]
-      }
-    ],
-    "mac": {
-      "target": [
-        "dmg",
-        "zip"
-      ],
-      "category": "public.app-category.finance"
-    }
   }
 }

@@ -8,7 +8,7 @@
 
 /* ── Tokens ───────────────────────────────────────────────────────────────── */
 .pw {
-  --pw-font: 'DM Sans', system-ui, sans-serif;
+  --pw-font: 'DM Sans', 'Noto Sans Thai', 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji';
   --pw-mono: 'IBM Plex Mono', monospace;
 
   --pw-bg-light:     #f5f3ee;
@@ -125,6 +125,9 @@
 }
 
 .pw__logo { font-size: 36px; line-height: 1; margin-bottom: 8px; }
+
+/* ไอคอนจริงแทนอีโมจิ */
+.pw__logo--icon { border-radius: 16px; object-fit: cover; margin: 0 auto 8px; display: block; }
 
 .pw__title {
   font-size: 22px;
@@ -511,3 +514,26 @@
   line-height: 1.5;
 }
 @media (prefers-color-scheme: dark) { .pw__footer-legal { color: var(--pw-muted-dark); } }
+
+/* ── ข้อเสนอ 3 ใบ (เพิ่ม 18 ส.ค. 2026) ─────────────────────────────────── */
+
+.pw__plan-badge--onetime {
+  background: #5a3f8f;
+  color: #fff;
+}
+
+.pw__plan-discount {
+  margin: var(--space-1, 4px) 0 0;
+  font-size: var(--text-xs, 11px);
+  font-weight: 700;
+  color: var(--color-success, #43dd9e);
+}
+
+/* 🔴 ข้อความบังคับของ Play — ห้ามซ่อนหรือย่อจนอ่านไม่ออก */
+.pw__promo-terms {
+  margin: var(--space-3, 12px) 0 0;
+  font-size: var(--text-xs, 11px);
+  line-height: 1.5;
+  color: var(--color-text-muted, #7b88b6);
+  text-align: center;
+}

@@ -15,39 +15,68 @@ const PRICE_TO_PLAN: Record<string, string> = {
 };
 
 Deno.serve(async (req) => {
-  const body = await req.text();
-  const sig  = req.headers.get('stripe-signature')!;
-  let event: Stripe.Event;
   try {
-    event = stripe.webhooks.constructEvent(body, sig, Deno.env.get('STRIPE_WEBHOOK_SECRET')!);
-  } catch {
-    return new Response('Bad signature', { status: 400 });
+    const body = await req.text();
+    const sig  = req.headers.get('stripe-signature')!;
+    const webhookSecret = Deno.env.get('STRIPE_WEBHOOK_SECRET');
+
+    if (!webhookSecret) {
+        throw new Error('STRIPE_WEBHOOK_SECRET is not set in Supabase secrets');
+    }
+
+    let event: Stripe.Event;
+    try {
+      event = stripe.webhooks.constructEvent(body, sig, webhookSecret);
+    } catch (err) {
+      console.error(`Webhook signature verification failed: ${err.message}`);
+      return new Response(`Webhook Error: ${err.message}`, { status: 400 });
+    }
+
+    console.log(`Processing event: ${event.type}`);
+
+    if (
+      event.type === 'customer.subscription.created' ||
+      event.type === 'customer.subscription.updated' ||
+      event.type === 'customer.subscription.deleted'
+    ) {
+      const sub = event.data.object as Stripe.Subscription;
+      const userId = sub.metadata?.supabase_user_id;
+
+      if (!userId) {
+        console.warn('No supabase_user_id found in subscription metadata');
+        return new Response('No user id', { status: 200 });
+      }
+
+      const priceId = sub.items.data[0]?.price.id;
+      const plan = PRICE_TO_PLAN[priceId] ?? 'free';
+
+      const statusMap: Record<string, string> = {
+        active: 'active', trialing: 'trial',
+        past_due: 'past_due', canceled: 'cancelled', unpaid: 'expired',
+      };
+
+      const { error } = await supabase.from('subscriptions').upsert({
+        user_id:                  userId,
+        plan:                     event.type === 'customer.subscription.deleted' ? 'free' : plan,
+        status:                   statusMap[sub.status] ?? 'active',
+        provider:                 'stripe',
+        provider_customer_id:     sub.customer as string,
+        provider_subscription_id: sub.id,
+        current_period_start:     new Date(sub.current_period_start * 1000).toISOString(),
+        current_period_end:       new Date(sub.current_period_end   * 1000).toISOString(),
+        cancel_at_period_end:     sub.cancel_at_period_end,
+        updated_at:               new Date().toISOString(),
+      }, { onConflict: 'user_id' });
+
+      if (error) {
+          console.error('Database upsert error:', error);
+          throw error;
+      }
+    }
+
+    return new Response('ok', { status: 200 });
+  } catch (error) {
+    console.error('Webhook handler error:', error.message);
+    return new Response(`Error: ${error.message}`, { status: 500 });
   }
-
-  const sub = event.data.object as Stripe.Subscription;
-  const userId = sub.metadata?.supabase_user_id;
-  if (!userId) return new Response('No user id', { status: 200 });
-
-  const priceId = sub.items.data[0]?.price.id;
-  const plan = PRICE_TO_PLAN[priceId] ?? 'free';
-
-  const statusMap: Record<string, string> = {
-    active: 'active', trialing: 'trial',
-    past_due: 'past_due', canceled: 'cancelled', unpaid: 'expired',
-  };
-
-  await supabase.from('subscriptions').upsert({
-    user_id:                  userId,
-    plan:                     event.type === 'customer.subscription.deleted' ? 'free' : plan,
-    status:                   statusMap[sub.status] ?? 'active',
-    provider:                 'stripe',
-    provider_customer_id:     sub.customer as string,
-    provider_subscription_id: sub.id,
-    current_period_start:     new Date(sub.current_period_start * 1000).toISOString(),
-    current_period_end:       new Date(sub.current_period_end   * 1000).toISOString(),
-    cancel_at_period_end:     sub.cancel_at_period_end,
-    updated_at:               new Date().toISOString(),
-  }, { onConflict: 'user_id' });
-
-  return new Response('ok', { status: 200 });
 });

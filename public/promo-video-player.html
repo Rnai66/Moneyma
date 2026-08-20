@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MoneyMa App — 60FPS Promo Video Showcase (วิดีโอพรีเซนเทชันโปรโมตแอป)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&family=Sarabun:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: #030712;
+      color: #fff;
+      font-family: 'Sarabun', 'Inter', sans-serif;
+      overflow-x: hidden;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+    }
+
+    /* Video Player Canvas Container */
+    .video-viewport {
+      width: 100%;
+      max-width: 1080px;
+      aspect-ratio: 16 / 9;
+      background: #090d16;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      border-radius: 24px;
+      margin: 30px 16px 20px;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 25px 60px -15px rgba(16, 185, 129, 0.25), 0 0 40px rgba(0, 0, 0, 0.8);
+    }
+
+    /* Background Ambient Glows */
+    .glow-1 {
+      position: absolute;
+      top: -30%;
+      left: -20%;
+      width: 60%;
+      height: 80%;
+      background: radial-gradient(circle, rgba(16, 185, 129, 0.35) 0%, rgba(0, 0, 0, 0) 70%);
+      filter: blur(50px);
+      pointer-events: none;
+      animation: pulseGlow 6s infinite alternate ease-in-out;
+    }
+
+    .glow-2 {
+      position: absolute;
+      bottom: -30%;
+      right: -20%;
+      width: 65%;
+      height: 85%;
+      background: radial-gradient(circle, rgba(99, 102, 241, 0.3) 0%, rgba(0, 0, 0, 0) 70%);
+      filter: blur(50px);
+      pointer-events: none;
+      animation: pulseGlow 8s infinite alternate ease-in-out;
+    }
+
+    @keyframes pulseGlow {
+      0% { opacity: 0.5; transform: scale(1); }
+      100% { opacity: 0.9; transform: scale(1.15); }
+    }
+
+    /* Scene Container */
+    .scene-layer {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 48px;
+      opacity: 0;
+      transform: scale(0.96) translateY(12px);
+      transition: all 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+      pointer-events: none;
+    }
+
+    .scene-layer.active {
+      opacity: 1;
+      transform: scale(1) translateY(0);
+      pointer-events: auto;
+    }
+
+    .scene-text {
+      flex: 1;
+      max-width: 480px;
+      z-index: 10;
+    }
+
+    .badge-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(16, 185, 129, 0.18);
+      border: 1px solid rgba(16, 185, 129, 0.4);
+      color: #34d399;
+      padding: 6px 14px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 700;
+      margin-bottom: 16px;
+      letter-spacing: 0.5px;
+    }
+
+    .scene-title {
+      font-size: 38px;
+      font-weight: 800;
+      line-height: 1.2;
+      margin-bottom: 14px;
+      background: linear-gradient(135deg, #ffffff 0%, #cbd5e1 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .scene-desc {
+      font-size: 16px;
+      color: #94a3b8;
+      line-height: 1.6;
+      margin-bottom: 24px;
+    }
+
+    .scene-media {
+      flex: 1;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      max-width: 460px;
+      position: relative;
+    }
+
+    .device-mockup {
+      width: 100%;
+      border-radius: 20px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6), 0 0 30px rgba(16, 185, 129, 0.2);
+      border: 2px solid rgba(255, 255, 255, 0.15);
+      overflow: hidden;
+      transform: perspective(1000px) rotateY(-8deg) rotateX(4deg);
+      transition: transform 0.5s ease;
+    }
+
+    .device-mockup:hover {
+      transform: perspective(1000px) rotateY(0deg) rotateX(0deg);
+    }
+
+    .device-mockup img {
+      width: 100%;
+      display: block;
+    }
+
+    /* Controls & Progress Bar */
+    .player-controls {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: linear-gradient(to top, rgba(3, 7, 18, 0.95), rgba(3, 7, 18, 0));
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      z-index: 100;
+    }
+
+    .play-btn {
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      border: none;
+      color: #fff;
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      font-size: 18px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 14px rgba(16, 185, 129, 0.4);
+      transition: all 0.2s ease;
+    }
+
+    .play-btn:hover {
+      transform: scale(1.08);
+    }
+
+    .progress-track {
+      flex: 1;
+      height: 6px;
+      background: rgba(255, 255, 255, 0.15);
+      border-radius: 999px;
+      overflow: hidden;
+      cursor: pointer;
+      position: relative;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #10b981 0%, #6366f1 100%);
+      border-radius: 999px;
+      transition: width 0.1s linear;
+    }
+
+    .scene-indicators {
+      display: flex;
+      gap: 8px;
+    }
+
+    .dot-btn {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.25);
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .dot-btn.active {
+      background: #10b981;
+      width: 24px;
+      border-radius: 999px;
+    }
+
+    /* Outro Call to Action */
+    .cta-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      color: #fff;
+      padding: 14px 28px;
+      border-radius: 14px;
+      font-weight: 700;
+      font-size: 16px;
+      text-decoration: none;
+      box-shadow: 0 8px 24px rgba(16, 185, 129, 0.4);
+    }
+
+    /* External Guide Action Bar */
+    .guide-action-bar {
+      display: flex;
+      gap: 14px;
+      margin-bottom: 40px;
+    }
+
+    .action-btn {
+      background: #1e293b;
+      color: #cbd5e1;
+      border: 1px solid #334155;
+      padding: 12px 24px;
+      border-radius: 12px;
+      font-family: 'Sarabun', sans-serif;
+      font-weight: 600;
+      font-size: 14px;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.2s ease;
+    }
+
+    .action-btn:hover {
+      background: #334155;
+      color: #fff;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Showcase Header -->
+  <div style="text-align: center; margin-top: 36px;">
+    <span class="badge-tag">✨ PROMOTIONAL VIDEO SHOWCASE (v2.2.1)</span>
+    <h1 style="font-size: 32px; font-weight: 800; margin: 8px 0 6px;">MoneyMa POS & Financial Ledger</h1>
+    <p style="color: #94a3b8; font-size: 15px;">วิดีโอพรีเซนเทชันนำเสนอแอปพลิเคชันสำหรับโซเชียลมีเดีย สโตร์ และลูกค้า</p>
+  </div>
+
+  <!-- Video Viewport -->
+  <div class="video-viewport" id="videoViewport">
+    <div class="glow-1"></div>
+    <div class="glow-2"></div>
+
+    <!-- SCENE 1: INTRO COVER -->
+    <div class="scene-layer active" id="scene-0">
+      <div class="scene-text">
+        <span class="badge-tag">🚀 ENTERPRISE POS & LEDGER</span>
+        <h2 class="scene-title">MoneyMa — แอปบริหารการเงิน & สต็อกสินค้า</h2>
+        <p class="scene-desc">รวมระบบบัญชีรายรับ-รายจ่าย คลังสินค้า 3 คลัง แคชเชียร์ POS และออกเอกสารในแอปเดียว</p>
+        <a href="https://moneyma-app.netlify.app" target="_blank" class="cta-btn">ทดลองใช้งานฟรี 7 วัน ➔</a>
+      </div>
+      <div class="scene-media">
+        <div class="device-mockup">
+          <img src="docs/images/moneyma_promo_banner.jpg" alt="Promo Banner" />
+        </div>
+      </div>
+    </div>
+
+    <!-- SCENE 2: DASHBOARD ANALYTICS -->
+    <div class="scene-layer" id="scene-1">
+      <div class="scene-text">
+        <span class="badge-tag">📊 FINANCIAL DASHBOARD</span>
+        <h2 class="scene-title">สรุปภาพรวมการเงิน เรียลไทม์</h2>
+        <p class="scene-desc">วิเคราะห์กระแสเงินสด (Cash Flow), เปรียบเทียบรายรับ-รายจ่าย และเตือนงบประมาณให้อัตโนมัติ</p>
+      </div>
+      <div class="scene-media">
+        <div class="device-mockup">
+          <img src="docs/images/media_1787129099744.png" alt="Dashboard" />
+        </div>
+      </div>
+    </div>
+
+    <!-- SCENE 3: AI SLIP SCANNER -->
+    <div class="scene-layer" id="scene-2">
+      <div class="scene-text">
+        <span class="badge-tag">🤖 AI VISION SCANNER</span>
+        <h2 class="scene-title">สแกนสลิป & ใบเสร็จ ด้วยปัญญาประดิษฐ์</h2>
+        <p class="scene-desc">เพียงถ่ายภาพสลิปโอนเงิน ระบบจะอ่านยอดเงิน วันที่ และลงบัญชีแยกหมวดหมู่ให้อัตโนมัติใน 2 วินาที</p>
+      </div>
+      <div class="scene-media">
+        <div class="device-mockup">
+          <img src="docs/images/media_1787129099805.png" alt="AI Scan" />
+        </div>
+      </div>
+    </div>
+
+    <!-- SCENE 4: MULTI-WAREHOUSE & POS -->
+    <div class="scene-layer" id="scene-3">
+      <div class="scene-text">
+        <span class="badge-tag">📦 3-WAREHOUSE POS & PO</span>
+        <h2 class="scene-title">ระบบคลังสินค้า 3 คลัง & แคชเชียร์ POS</h2>
+        <p class="scene-desc">จัดสรรสต็อกแยก 3 คลัง ตัดสต็อกขายหน้าร้าน พิมพ์สลิปใบเสร็จ และออกใบสั่งซื้อ (PO) อัตโนมัติ</p>
+      </div>
+      <div class="scene-media">
+        <div class="device-mockup">
+          <img src="docs/images/media_1787131961424.png" alt="POS Catalog" />
+        </div>
+      </div>
+    </div>
+
+    <!-- SCENE 5: STATEMENT EXPORTER -->
+    <div class="scene-layer" id="scene-4">
+      <div class="scene-text">
+        <span class="badge-tag">📄 STATEMENT & QR BUILDER</span>
+        <h2 class="scene-title">ออกสเตทเม้นท์ PDF / CSV / PromptPay QR</h2>
+        <p class="scene-desc">ปรับแต่งโลโก้ ข้อมูลบริษัท พิมพ์สเตทเม้นท์ทางการ และสร้าง PromptPay QR สแกนรับเงินได้ทันที</p>
+      </div>
+      <div class="scene-media">
+        <div class="device-mockup">
+          <img src="docs/images/media_1787129099771.png" alt="Statement Export" />
+        </div>
+      </div>
+    </div>
+
+    <!-- SCENE 6: OUTRO CTA -->
+    <div class="scene-layer" id="scene-5">
+      <div class="scene-text">
+        <span class="badge-tag">📲 READY FOR STORE & ENTERPRISE</span>
+        <h2 class="scene-title">ยกระดับธุรกิจของคุณ วันนี้</h2>
+        <p class="scene-desc">พร้อมใช้งานบน Android, iOS และ Web Browser ด้วยฐานข้อมูล Supabase Cloud RLS Security ปลอดภัย 100%</p>
+        <a href="https://moneyma-app.netlify.app" target="_blank" class="cta-btn">ดาวน์โหลด / ใช้งานออนไลน์ ➔</a>
+      </div>
+      <div class="scene-media">
+        <div class="device-mockup">
+          <img src="docs/images/media_1787129099779.png" alt="Outro" />
+        </div>
+      </div>
+    </div>
+
+    <!-- Controls Bar -->
+    <div class="player-controls">
+      <button class="play-btn" id="playBtn" onclick="togglePlay()">⏸</button>
+      <div class="progress-track" onclick="seek(event)">
+        <div class="progress-bar-fill" id="progressBar"></div>
+      </div>
+      <div class="scene-indicators" id="indicators">
+        <div class="dot-btn active" onclick="goToScene(0)"></div>
+        <div class="dot-btn" onclick="goToScene(1)"></div>
+        <div class="dot-btn" onclick="goToScene(2)"></div>
+        <div class="dot-btn" onclick="goToScene(3)"></div>
+        <div class="dot-btn" onclick="goToScene(4)"></div>
+        <div class="dot-btn" onclick="goToScene(5)"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom Navigation Buttons -->
+  <div class="guide-action-bar">
+    <a href="user-guide.html" class="action-btn">📖 เปิดอ่านคู่มือฉบับเต็ม (Full Manual)</a>
+    <a href="user-guide.html" onclick="window.open('user-guide.html'); return false;" class="action-btn">🖨️ พิมพ์เอกสารคู่มือ PDF</a>
+  </div>
+
+  <script>
+    const totalScenes = 6;
+    const sceneDuration = 5; // seconds per scene
+    const totalDuration = totalScenes * sceneDuration;
+    let currentScene = 0;
+    let isPlaying = true;
+    let elapsed = 0;
+    let timer = null;
+
+    function updateView() {
+      for (let i = 0; i < totalScenes; i++) {
+        const sceneEl = document.getElementById(`scene-${i}`);
+        const dotEl = document.querySelectorAll('.dot-btn')[i];
+        if (i === currentScene) {
+          sceneEl.classList.add('active');
+          dotEl.classList.add('active');
+        } else {
+          sceneEl.classList.remove('active');
+          dotEl.classList.remove('active');
+        }
+      }
+    }
+
+    function tick() {
+      if (!isPlaying) return;
+      elapsed += 0.1;
+      if (elapsed >= totalDuration) {
+        elapsed = 0;
+      }
+      currentScene = Math.floor(elapsed / sceneDuration);
+      const pct = (elapsed / totalDuration) * 100;
+      document.getElementById('progressBar').style.width = `${pct}%`;
+      updateView();
+    }
+
+    function togglePlay() {
+      isPlaying = !isPlaying;
+      document.getElementById('playBtn').innerText = isPlaying ? '⏸' : '▶';
+    }
+
+    function goToScene(idx) {
+      currentScene = idx;
+      elapsed = idx * sceneDuration;
+      document.getElementById('progressBar').style.width = `${(elapsed / totalDuration) * 100}%`;
+      updateView();
+    }
+
+    function seek(e) {
+      const rect = e.currentTarget.getBoundingClientRect();
+      const clickX = e.clientX - rect.left;
+      const pct = clickX / rect.width;
+      elapsed = pct * totalDuration;
+      currentScene = Math.min(totalScenes - 1, Math.floor(elapsed / sceneDuration));
+      document.getElementById('progressBar').style.width = `${pct * 100}%`;
+      updateView();
+    }
+
+    setInterval(tick, 100);
+  </script>
+</body>
+</html>

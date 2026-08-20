@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../services/AuthContext';
 import { useLanguage } from '../services/LanguageContext';
 import '../styles/Auth.css';
+import { APP_ICON } from '../config/appInfo';
 
 export default function Register({ onSwitchToLogin, onRegisterSuccess }) {
   const { signUp, error: authError, loading: isLoading } = useAuth();
@@ -106,9 +107,10 @@ export default function Register({ onSwitchToLogin, onRegisterSuccess }) {
         </div>
 
         <div className="auth-header">
-          <div className="auth-logo">💰</div>
+          <img className="auth-logo auth-logo--icon" src={APP_ICON} alt="MoneyMa" width={60} height={60} />
           <h1>MoneyMa</h1>
-          <p>{language === 'en' ? 'Personal Finance Manager' : 'ตัวจัดการการเงินส่วนตัว'}</p>
+          {/* ใช้คีย์ i18n ตัวเดียวกับหน้าเกี่ยวกับ แก้ที่เดียวเปลี่ยนทั้งแอป */}
+          <p>{t.appTagline}</p>
         </div>
 
         {isSuccess ? (
@@ -116,9 +118,7 @@ export default function Register({ onSwitchToLogin, onRegisterSuccess }) {
             <div style={{ fontSize: '48px', marginBottom: '16px' }}>📧</div>
             <h2>{language === 'th' ? 'สมัครสมาชิกสำเร็จ!' : 'Registration Successful!'}</h2>
             <p style={{ color: 'var(--color-text-secondary)', marginBottom: '24px', lineHeight: '1.5' }}>
-              {language === 'th' 
-                ? 'ระบบได้ส่งอีเมลยืนยันตัวตนไปให้คุณแล้ว กรุณาตรวจสอบอีเมลและคลิกลิงก์เพื่อเปิดใช้งานบัญชี' 
-                : 'A confirmation link has been sent to your email. Please check your inbox and confirm your account.'}
+              {t.registerConfirmSent}
             </p>
             <button
               type="button"

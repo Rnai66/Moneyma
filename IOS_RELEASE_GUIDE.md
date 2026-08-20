@@ -7,7 +7,7 @@
 - `Archive` passes on this machine.
 - `Development export` passes on this machine.
 - Bundle ID: `com.personalfinance.manager`
-- Team ID: `H4X9654279`
+- Team ID: `BF252F9KD4`
 
 ## Signed Build
 

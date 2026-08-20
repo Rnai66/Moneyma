@@ -7,8 +7,10 @@ function Statistics({ transactions, darkMode, t }) {
   const fmt = (v) => new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB', minimumFractionDigits: 0 }).format(v);
 
   const tooltip = darkMode
-    ? { backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '10px', color: '#f1f5f9', fontSize: '13px' }
-    : { backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '10px', fontSize: '13px' };
+    ? { backgroundColor: '#131f3a', border: '1px solid #2a3a5f', borderRadius: '12px', color: '#f1f5f9', fontSize: '13px' }
+    : { backgroundColor: '#fff', border: '1px solid #ece0e6', borderRadius: '12px', fontSize: '13px' };
+
+  const axisStyle = { fontSize: '12px' };
 
   const monthlyData = (() => {
     const m = {};
@@ -27,6 +29,7 @@ function Statistics({ transactions, darkMode, t }) {
 
   let totalIncome = 0, totalExpense = 0;
   transactions?.forEach(tx => { if (tx.type === 'income') totalIncome += tx.amount; else totalExpense += tx.amount; });
+
   const totalByType = [
     { name: t.income, value: totalIncome, fill: '#10b981' },
     { name: t.expense, value: totalExpense, fill: '#ef4444' },
@@ -49,162 +52,186 @@ function Statistics({ transactions, darkMode, t }) {
     return c;
   })();
 
-  const ChartCard = ({ title, children }) => (
-    <div className="card" style={{ padding: '24px' }}>
-      <span className="section-title-bar" style={{ marginBottom: '20px', display: 'flex' }}>{title}</span>
-      {children}
-    </div>
-  );
+  const hasAnyData = (transactions?.length || 0) > 0;
 
-  const CategoryPieCard = ({ title, data }) => (
-    <ChartCard title={title}>
-      <div className="stats-pie-layout" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 220px) minmax(0, 1fr)', gap: '18px', alignItems: 'center' }}>
-        <ResponsiveContainer width="100%" height={240}>
-          <PieChart>
-            <Pie
-              data={data}
-              cx="50%"
-              cy="50%"
-              outerRadius={88}
-              innerRadius={44}
-              dataKey="value"
-              label={false}
-              labelLine={false}
-            >
-              {data.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-            </Pie>
-            <Tooltip formatter={fmt} contentStyle={tooltip} />
-          </PieChart>
-        </ResponsiveContainer>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', minWidth: 0 }}>
-          {data.map((item, index) => {
-            const percent = totalIncome + totalExpense > 0
-              ? ((item.value / data.reduce((sum, row) => sum + row.value, 0)) * 100).toFixed(0)
-              : 0;
-
-            return (
-              <div key={`${title}-${item.name}`} style={{
-                display: 'grid',
-                gridTemplateColumns: '12px minmax(0, 1fr) auto',
-                gap: '10px',
-                alignItems: 'center',
-                padding: '10px 12px',
-                borderRadius: '12px',
-                background: 'var(--bg-card-inner)',
-                border: '1px solid var(--color-border)',
-              }}>
-                <span style={{ width: '12px', height: '12px', borderRadius: '999px', background: COLORS[index % COLORS.length] }} />
-                <div style={{ minWidth: 0 }}>
-                  <div className="stats-category-label" style={{
-                    color: 'var(--color-text-primary)',
-                    fontSize: '14px',
-                    fontWeight: '700',
-                    whiteSpace: 'normal',
-                    wordBreak: 'normal',
-                    overflowWrap: 'break-word',
-                    lineHeight: 1.45,
-                  }}>
-                    {item.name}
-                  </div>
-                  <div style={{ color: 'var(--color-text-secondary)', fontSize: '12px', marginTop: '2px' }}>
-                    {fmt(item.value)}
-                  </div>
-                </div>
-                <strong style={{ color: 'var(--color-text-secondary)', fontSize: '13px' }}>{percent}%</strong>
-              </div>
-            );
-          })}
+  const ChartCard = ({ title, subtitle, children }) => (
+    <section className="panel">
+      <div className="panel-header">
+        <div>
+          <span className="section-title-bar">{title}</span>
+          {subtitle && <p className="panel-subtitle">{subtitle}</p>}
         </div>
       </div>
-    </ChartCard>
+      {children}
+    </section>
   );
 
-  const EmptyState = () => (
-    <div style={{ textAlign: 'center', padding: '40px', color: 'var(--color-text-secondary)' }}>
-      <div style={{ fontSize: '32px', opacity: 0.25, marginBottom: '10px' }}>📊</div>
-      <p style={{ fontWeight: '500' }}>{t.noData}</p>
+  const EmptyState = ({ icon = '📊', label }) => (
+    <div className="empty-state">
+      <div className="empty-state-icon">{icon}</div>
+      <strong>{label || t.noData}</strong>
     </div>
   );
 
+  const CategoryPieCard = ({ title, data }) => {
+    const sum = data.reduce((acc, row) => acc + row.value, 0);
+
+    return (
+      <ChartCard title={title}>
+        <div className="stats-pie-layout">
+          <div className="chart-frame">
+            <ResponsiveContainer width="100%" height={240}>
+              <PieChart>
+                <Pie
+                  data={data}
+                  cx="50%"
+                  cy="50%"
+                  outerRadius={88}
+                  innerRadius={52}
+                  paddingAngle={2}
+                  dataKey="value"
+                  label={false}
+                  labelLine={false}
+                  stroke="none"
+                >
+                  {data.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                </Pie>
+                <Tooltip formatter={fmt} contentStyle={tooltip} />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+
+          <div className="stats-legend">
+            {data.map((item, index) => {
+              const percent = sum > 0 ? ((item.value / sum) * 100).toFixed(0) : 0;
+              return (
+                <div key={`${title}-${item.name}`} className="stats-legend-row">
+                  <span
+                    className="stats-legend-dot"
+                    style={{ background: COLORS[index % COLORS.length] }}
+                  />
+                  <div style={{ minWidth: 0 }}>
+                    <div className="stats-category-label" style={{ color: 'var(--color-text-primary)', fontWeight: 650 }}>
+                      {item.name}
+                    </div>
+                    <div className="num" style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-xs)' }}>
+                      {fmt(item.value)}
+                    </div>
+                  </div>
+                  <strong className="num" style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--text-sm)' }}>
+                    {percent}%
+                  </strong>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </ChartCard>
+    );
+  };
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      <div>
-        <h1 style={{ fontSize: '26px', fontWeight: '800', color: 'var(--color-text-primary)', letterSpacing: '-0.03em', margin: 0 }}>{t.statisticsTitle}</h1>
-        <p style={{ color: 'var(--color-text-secondary)', fontSize: '14px', marginTop: '4px' }}>{t.statisticsSubtitle}</p>
-      </div>
+    <div className="page">
+      <header className="page-heading">
+        <div>
+          <span className="eyebrow">{t.statisticsSubtitle}</span>
+          <h1>{t.statisticsTitle}</h1>
+          <p>{t.statisticsSubtitle}</p>
+        </div>
+        <div className="page-heading-actions">
+          <span className="page-chip">{t.period}</span>
+        </div>
+      </header>
+
+      {!hasAnyData && (
+        <section className="panel">
+          <EmptyState label={t.noData} />
+        </section>
+      )}
 
       {monthlyData.length > 0 && (
         <ChartCard title={t.monthlyTrend}>
-          <ResponsiveContainer width="100%" height={280}>
-            <LineChart data={monthlyData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-              <XAxis dataKey="month" stroke="var(--color-text-secondary)" style={{ fontSize: '12px' }} />
-              <YAxis stroke="var(--color-text-secondary)" style={{ fontSize: '12px' }} />
-              <Tooltip formatter={fmt} contentStyle={tooltip} />
-              <Legend />
-              <Line type="monotone" dataKey="income" stroke="#10b981" strokeWidth={2.5} dot={false} name={t.income} />
-              <Line type="monotone" dataKey="expense" stroke="#ef4444" strokeWidth={2.5} dot={false} name={t.expense} />
-              <Line type="monotone" dataKey="balance" stroke="#6366f1" strokeWidth={2.5} dot={false} name={t.netBalance} />
-            </LineChart>
-          </ResponsiveContainer>
+          <div className="chart-frame">
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={monthlyData} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-divider)" vertical={false} />
+                <XAxis dataKey="month" stroke="var(--color-text-muted)" style={axisStyle} tickLine={false} axisLine={false} />
+                <YAxis stroke="var(--color-text-muted)" style={axisStyle} tickLine={false} axisLine={false} width={72} />
+                <Tooltip formatter={fmt} contentStyle={tooltip} />
+                <Legend iconType="circle" wrapperStyle={{ fontSize: '13px', paddingTop: '8px' }} />
+                <Line type="monotone" dataKey="income" stroke="#10b981" strokeWidth={2.5} dot={false} name={t.income} />
+                <Line type="monotone" dataKey="expense" stroke="#ef4444" strokeWidth={2.5} dot={false} name={t.expense} />
+                <Line type="monotone" dataKey="balance" stroke="#6366f1" strokeWidth={2.5} dot={false} name={t.netBalance} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
         </ChartCard>
       )}
 
-      <ChartCard title={t.incomeVsExpense}>
-        <ResponsiveContainer width="100%" height={280}>
-          <BarChart data={totalByType} barSize={56}>
-            <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-            <XAxis dataKey="name" stroke="var(--color-text-secondary)" style={{ fontSize: '12px' }} />
-            <YAxis stroke="var(--color-text-secondary)" style={{ fontSize: '12px' }} />
-            <Tooltip formatter={fmt} contentStyle={tooltip} />
-            <Bar dataKey="value" radius={[10, 10, 0, 0]}>
-              {totalByType.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
-      </ChartCard>
+      {hasAnyData && (
+        <ChartCard title={t.incomeVsExpense}>
+          <div className="chart-frame">
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={totalByType} barSize={64} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-divider)" vertical={false} />
+                <XAxis dataKey="name" stroke="var(--color-text-muted)" style={axisStyle} tickLine={false} axisLine={false} />
+                <YAxis stroke="var(--color-text-muted)" style={axisStyle} tickLine={false} axisLine={false} width={72} />
+                <Tooltip formatter={fmt} contentStyle={tooltip} cursor={{ fill: 'var(--bg-subtle)' }} />
+                <Bar dataKey="value" radius={[12, 12, 0, 0]}>
+                  {totalByType.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </ChartCard>
+      )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' }}>
-        {expByCat.length > 0 && (
-          <CategoryPieCard title={t.expensesByCategory} data={expByCat} />
-        )}
-        {incByCat.length > 0 && (
-          <CategoryPieCard title={t.incomeByCategory} data={incByCat} />
-        )}
-      </div>
+      {(expByCat.length > 0 || incByCat.length > 0) && (
+        <div className="grid grid-auto-lg">
+          {expByCat.length > 0 && <CategoryPieCard title={t.expensesByCategory} data={expByCat} />}
+          {incByCat.length > 0 && <CategoryPieCard title={t.incomeByCategory} data={incByCat} />}
+        </div>
+      )}
 
-      <div className="card" style={{ padding: '24px' }}>
-        <span className="section-title-bar" style={{ marginBottom: '20px', display: 'flex' }}>{t.summaryByCategory}</span>
+      <section className="panel">
+        <div className="panel-header">
+          <span className="section-title-bar">{t.summaryByCategory}</span>
+        </div>
+
         {Object.keys(stats).length > 0 ? (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <div className="table-wrap">
+            {/* data-label ใช้โดย CSS ตอนจอแคบ เพื่อพลิกตารางเป็นการ์ดที่มีป้ายกำกับในตัว */}
+            <table className="data-table data-table--stack">
               <thead>
-                <tr style={{ background: 'var(--bg-table-header)', borderBottom: '1px solid var(--color-border)' }}>
-                  {[t.thCategory, t.thIncome, t.thExpense, t.thNet].map((h, i) => (
-                    <th key={h} style={{
-                      padding: '11px 14px', textAlign: i === 0 ? 'left' : 'right', fontWeight: '600', fontSize: '11.5px', textTransform: 'uppercase', letterSpacing: '0.06em',
-                      color: i === 0 ? 'var(--color-text-secondary)' : i === 1 ? '#10b981' : i === 2 ? '#ef4444' : '#6366f1'
-                    }}>{h}</th>
-                  ))}
+                <tr>
+                  <th>{t.thCategory}</th>
+                  <th className="is-num" style={{ color: 'var(--color-success)' }}>{t.thIncome}</th>
+                  <th className="is-num" style={{ color: 'var(--color-danger)' }}>{t.thExpense}</th>
+                  <th className="is-num" style={{ color: 'var(--accent-primary)' }}>{t.thNet}</th>
                 </tr>
               </thead>
               <tbody>
                 {Object.entries(stats).map(([cat, d]) => (
-                  <tr key={cat} style={{ borderBottom: '1px solid var(--color-table-row-border)', transition: 'background .15s' }}
-                    onMouseEnter={e => e.currentTarget.style.background = 'var(--color-tr-hover)'}
-                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                    <td style={{ padding: '12px 14px', fontWeight: '600', color: 'var(--color-text-primary)', fontSize: '13.5px' }}>{cat}</td>
-                    <td style={{ padding: '12px 14px', textAlign: 'right', color: '#10b981', fontWeight: '700', fontSize: '13.5px' }}>{fmt(d.income)}</td>
-                    <td style={{ padding: '12px 14px', textAlign: 'right', color: '#ef4444', fontWeight: '700', fontSize: '13.5px' }}>{fmt(d.expense)}</td>
-                    <td style={{ padding: '12px 14px', textAlign: 'right', color: '#6366f1', fontWeight: '700', fontSize: '13.5px' }}>{fmt(d.income - d.expense)}</td>
+                  <tr key={cat}>
+                    <td style={{ fontWeight: 650, color: 'var(--color-text-primary)' }}>{cat}</td>
+                    <td data-label={t.thIncome} className="is-num num" style={{ color: 'var(--color-success)', fontWeight: 700 }}>{fmt(d.income)}</td>
+                    <td data-label={t.thExpense} className="is-num num" style={{ color: 'var(--color-danger)', fontWeight: 700 }}>{fmt(d.expense)}</td>
+                    <td data-label={t.thNet} className="is-num num" style={{ color: 'var(--accent-primary)', fontWeight: 700 }}>{fmt(d.income - d.expense)}</td>
                   </tr>
                 ))}
               </tbody>
+              <tfoot>
+                <tr>
+                  <td style={{ fontWeight: 800 }}>{t.thNet}</td>
+                  <td data-label={t.thIncome} className="is-num num" style={{ color: 'var(--color-success)' }}>{fmt(totalIncome)}</td>
+                  <td data-label={t.thExpense} className="is-num num" style={{ color: 'var(--color-danger)' }}>{fmt(totalExpense)}</td>
+                  <td data-label={t.thNet} className="is-num num" style={{ color: 'var(--accent-primary)' }}>{fmt(totalIncome - totalExpense)}</td>
+                </tr>
+              </tfoot>
             </table>
           </div>
         ) : <EmptyState />}
-      </div>
+      </section>
     </div>
   );
 }

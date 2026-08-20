@@ -2,10 +2,12 @@ import React, { useState } from 'react';
 import { useAuth } from '../services/AuthContext';
 import { useLanguage } from '../services/LanguageContext';
 import '../styles/Auth.css';
+import { APP_ICON } from '../config/appInfo';
 
 export default function Login({ onSwitchToRegister, onLoginSuccess, onContinueAsGuest }) {
   const {
     signIn,
+    signInWithGoogle,
     resetPassword,
     enableDevBypass,
     isDevBypassEnabled,
@@ -126,9 +128,10 @@ export default function Login({ onSwitchToRegister, onLoginSuccess, onContinueAs
         </div>
 
         <div className="auth-header">
-          <div className="auth-logo">💰</div>
+          <img className="auth-logo auth-logo--icon" src={APP_ICON} alt="MoneyMa" width={60} height={60} />
           <h1>MoneyMa</h1>
-          <p>{language === 'en' ? 'Personal Finance Manager' : 'ตัวจัดการการเงินส่วนตัว'}</p>
+          {/* ใช้คีย์ i18n ตัวเดียวกับหน้าเกี่ยวกับ แก้ที่เดียวเปลี่ยนทั้งแอป */}
+          <p>{t.appTagline}</p>
         </div>
 
         {isResetting ? (
@@ -230,6 +233,20 @@ export default function Login({ onSwitchToRegister, onLoginSuccess, onContinueAs
             >
               {isSubmitting || isLoading ? t.signingIn : t.signInBtn}
             </button>
+
+            <div className="auth-divider">
+              <span>{language === 'th' ? 'หรือเข้าสู่ระบบด้วย' : 'or continue with'}</span>
+            </div>
+
+            <button
+              type="button"
+              className="google-button"
+              onClick={signInWithGoogle}
+              disabled={isSubmitting || isLoading}
+            >
+              <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" />
+              {language === 'th' ? 'เข้าสู่ระบบด้วย Google' : 'Sign in with Google'}
+            </button>
           </form>
         )}
 
@@ -247,15 +264,26 @@ export default function Login({ onSwitchToRegister, onLoginSuccess, onContinueAs
         </div>
 
         <div className="auth-demo">
-          <p>{t.demoMode}</p>
+          <div className="auth-demo-divider">
+            <span className="auth-demo-title">{t.demoMode}</span>
+          </div>
+
           <button
             type="button"
             onClick={onContinueAsGuest || onLoginSuccess}
             className="demo-button"
             disabled={isSubmitting || isLoading}
           >
-            {t.continueGuest}
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+              <path d="M5 12h14M12 5l7 7-7 7"/>
+            </svg>
+            <span>{t.continueGuest}</span>
           </button>
+
+          <p className="auth-demo-subtitle">
+            {t.guestSubtitle}
+          </p>
+
           {isDevBypassEnabled && (
             <button
               type="button"

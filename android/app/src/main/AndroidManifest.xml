@@ -25,10 +25,12 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
 
+                <!-- Matches every path under moneyma://auth — covers both the
+                     OAuth callback (moneyma://auth) and moneyma://auth/update-password.
+                     The old pathPrefix-only filter silently dropped the OAuth callback. -->
                 <data
                     android:scheme="moneyma"
-                    android:host="auth"
-                    android:pathPrefix="/update-password" />
+                    android:host="auth" />
             </intent-filter>
         </activity>
 
@@ -42,6 +44,10 @@
     </application>
 
     <!-- Permissions -->
-
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+
+    <!-- Camera: used for scanning bills and payment slips (core feature) -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
 </manifest>

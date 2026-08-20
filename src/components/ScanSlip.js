@@ -1,25 +1,34 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { useSlipScan } from '../hooks/useSlipScan';
 import './ScanSlip.css';
 
 // ─── Capacitor Camera (graceful fallback on web) ───────────────────────────
 import { Capacitor } from '@capacitor/core';
 import { Camera, CameraSource } from '@capacitor/camera';
+import ScanQuotaBar from './ScanQuotaBar';
 
 // ─── Category display map ──────────────────────────────────────────────────
 const CATEGORY_ICONS = {
-  Food: '🍔',
-  Transport: '🚗',
-  Shopping: '🛍️',
-  Bills: '💡',
-  Transfer: '👫',
-  Other: '📦',
+  Food: 'Food',
+  Transport: 'Transport',
+  Shopping: 'Shopping',
+  Bills: 'Bills',
+  Transfer: 'Transfer',
+  Other: 'Other',
 };
 
 // ─── Main Component ────────────────────────────────────────────────────────
 export default function ScanSlip({ onTransactionCreate, onClose, t }) {
   const [activeTab, setActiveTab] = useState('camera');
   // 'camera' | 'gallery' | 'autoscan'
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') onClose?.();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
 
   const {
     status,
@@ -153,24 +162,28 @@ export default function ScanSlip({ onTransactionCreate, onClose, t }) {
     [reset]
   );
 
+  const cameraSvg = <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>;
+  const imageSvg = <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>;
+  const searchSvg = <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>;
+
   // ─── Render ───────────────────────────────────────────────────────────────
   return (
     <div className="scan-slip">
       {/* Header */}
       <div className="scan-slip__header">
-        <button className="scan-slip__close" onClick={onClose} aria-label="Close">
-          ✕
+        <button className="scan-slip__close" onClick={onClose} aria-label="Close" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
-        <h2 className="scan-slip__title">{t?.scanSlipTitle || 'สแกนสลิป'}</h2>
+        <h2 className="scan-slip__title">{t?.scanSlipTitle}</h2>
         <div />
       </div>
 
       {/* Tabs */}
       <div className="scan-slip__tabs" role="tablist">
         {[
-          { id: 'camera', icon: '📷', label: t?.scanSlipCamera || 'ถ่ายภาพ' },
-          { id: 'gallery', icon: '🖼️', label: t?.scanSlipUpload || 'เลือกรูป' },
-          { id: 'autoscan', icon: '🔍', label: 'Auto-scan' },
+          { id: 'camera', icon: cameraSvg, label: t?.scanSlipCamera },
+          { id: 'gallery', icon: imageSvg, label: t?.scanSlipUpload },
+          { id: 'autoscan', icon: searchSvg, label: 'Auto-scan' },
         ].map((tab) => (
           <button
             key={tab.id}
@@ -179,7 +192,7 @@ export default function ScanSlip({ onTransactionCreate, onClose, t }) {
             className={`scan-slip__tab ${activeTab === tab.id ? 'scan-slip__tab--active' : ''}`}
             onClick={() => switchTab(tab.id)}
           >
-            <span className="scan-slip__tab-icon">{tab.icon}</span>
+            <span className="scan-slip__tab-icon" style={{ display: 'inline-flex', alignItems: 'center' }}>{tab.icon}</span>
             <span className="scan-slip__tab-label">{tab.label}</span>
           </button>
         ))}
@@ -188,14 +201,19 @@ export default function ScanSlip({ onTransactionCreate, onClose, t }) {
       {/* Tab Content */}
       <div className="scan-slip__body">
 
+        {/* บอกโควตาก่อนกดถ่าย ไม่ใช่หลังสแกนเสร็จแล้วเด้ง error */}
+        {status === 'idle' && <ScanQuotaBar t={t} />}
+
         {/* ── CAMERA TAB ──────────────────────────────────────── */}
         {activeTab === 'camera' && (
           <div className="scan-slip__pane">
             {status === 'idle' && (
               <div className="scan-slip__drop-zone" onClick={handleCameraCapture}>
-                <div className="scan-slip__drop-icon">📷</div>
-                <p className="scan-slip__drop-title">{t?.scanSlipCamera || 'ถ่ายรูปสลิป'}</p>
-                <p className="scan-slip__drop-hint">{t?.scanSlipDesc || 'แตะเพื่อเปิดกล้อง'}</p>
+                <div className="scan-slip__drop-icon" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                </div>
+                <p className="scan-slip__drop-title">{t?.scanSlipCamera}</p>
+                <p className="scan-slip__drop-hint">{t?.scanSlipDesc}</p>
               </div>
             )}
             {status === 'scanning' && <ScanningIndicator t={t} />}
@@ -230,8 +248,8 @@ export default function ScanSlip({ onTransactionCreate, onClose, t }) {
                 onDragOver={(e) => e.preventDefault()}
               >
                 <div className="scan-slip__drop-icon">🖼️</div>
-                <p className="scan-slip__drop-title">{t?.scanSlipUpload || 'เลือกรูปจาก Gallery'}</p>
-                <p className="scan-slip__drop-hint">แตะเพื่อเลือก หรือลากไฟล์มาวาง</p>
+                <p className="scan-slip__drop-title">{t?.scanSlipUpload}</p>
+                <p className="scan-slip__drop-hint">{t?.tapOrDrag}</p>
                 <input
                   ref={galleryInputRef}
                   type="file"
@@ -263,16 +281,18 @@ export default function ScanSlip({ onTransactionCreate, onClose, t }) {
           <div className="scan-slip__pane">
             {status === 'idle' && (
               <div className="scan-slip__autoscan-start">
-                <div className="scan-slip__drop-icon">🔍</div>
-                <p className="scan-slip__drop-title">{t?.autoScanTitle || 'Auto-scan สลิปจาก Gallery'}</p>
+                <div className="scan-slip__drop-icon" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                </div>
+                <p className="scan-slip__drop-title">{t?.autoScanTitle}</p>
                 <p className="scan-slip__drop-hint">
-                  {t?.autoScanDesc || 'เลือกรูปหลายใบ — AI จะสแกนและจัดหมวดหมู่ให้อัตโนมัติ'}
+                  {t?.autoScanDesc}
                 </p>
                 <button
                   className="scan-slip__btn scan-slip__btn--primary"
                   onClick={() => autoScanInputRef.current?.click()}
                 >
-                  {t?.chooseSlipImage || 'เลือกรูปสลิป'}
+                  {t?.chooseSlipImage}
                 </button>
                 <input
                   ref={autoScanInputRef}
@@ -316,9 +336,9 @@ export default function ScanSlip({ onTransactionCreate, onClose, t }) {
 function ScanningIndicator({t}) {
   return (
     <div className="scan-slip__scanning">
-      <div className="scan-slip__spinner" aria-label="กำลังสแกน..." />
-      <p className="scan-slip__scanning-title">{t?.scanSlipProcessing || 'AI กำลังอ่านสลิป...'}</p>
-      <p className="scan-slip__scanning-hint">{t?.scanSlipHint || 'ใช้เวลาไม่กี่วินาที'}</p>
+      <div className="scan-slip__spinner" aria-label={t?.scanSlipProcessing} />
+      <p className="scan-slip__scanning-title">{t?.scanSlipProcessing}</p>
+      <p className="scan-slip__scanning-hint">{t?.scanSlipHint}</p>
     </div>
   );
 }
@@ -326,10 +346,12 @@ function ScanningIndicator({t}) {
 function ErrorState({ message, onRetry, t }) {
   return (
     <div className="scan-slip__error">
-      <div className="scan-slip__error-icon">⚠️</div>
+      <div className="scan-slip__error-icon" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+        <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="var(--color-danger)" strokeWidth="1.8"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      </div>
       <p className="scan-slip__error-message">{message}</p>
       <button className="scan-slip__btn scan-slip__btn--secondary" onClick={onRetry}>
-        {t?.retry || 'ลองใหม่'}
+        {t?.retry}
       </button>
     </div>
   );
@@ -358,15 +380,14 @@ function SingleResult({ result, form, setForm, onConfirm, onRetry, t }) {
   const statusColor = tx.status === 'สำเร็จ'
     ? 'var(--color-success)' : tx.status === 'ล้มเหลว'
     ? 'var(--color-danger)' : 'var(--color-text-secondary)';
-  const statusIcon = tx.status === 'สำเร็จ' ? '✅' : tx.status === 'ล้มเหลว' ? '❌' : '⏳';
 
   return (
     <div className="scan-slip__result">
       {/* Preview */}
       <div className="scan-slip__preview-wrap">
-        <img src={previewUrl} alt="สลิป" className="scan-slip__preview-img" />
+        <img src={previewUrl} alt={t?.slipAlt} className="scan-slip__preview-img" />
         {isDuplicate && (
-          <div className="scan-slip__duplicate-badge">{t?.scanSlipDuplicate || 'เคยสแกนแล้ว'}</div>
+          <div className="scan-slip__duplicate-badge">{t?.scanSlipDuplicate}</div>
         )}
       </div>
 
@@ -377,24 +398,23 @@ function SingleResult({ result, form, setForm, onConfirm, onRetry, t }) {
           <div className="scan-slip__slip-header">
             {tx.status && (
               <span className="scan-slip__status-badge" style={{ color: statusColor }}>
-                {statusIcon} {tx.payment_type || ''} {tx.status}
+                {tx.payment_type || ''} {tx.status}
               </span>
             )}
             {tx.bank_name && (
-              <span className="scan-slip__bank-tag">🏦 {tx.bank_name}</span>
+              <span className="scan-slip__bank-tag">{tx.bank_name}</span>
             )}
           </div>
         )}
 
         {/* Date & Time */}
-        <SlipDetailRow icon="📅" label="วันที่ / เวลา" value={[tx.date, tx.time].filter(Boolean).join(' · ')} />
+        <SlipDetailRow icon="" label={t?.dateTime} value={[tx.date, tx.time].filter(Boolean).join(' · ')} />
 
         {/* From */}
         {(tx.sender_name || tx.sender_account) && (
           <div className="scan-slip__detail-row">
-            <span className="scan-slip__detail-icon">👤</span>
             <div className="scan-slip__detail-body">
-              <span className="scan-slip__detail-label">{t?.sender || 'จาก'}</span>
+              <span className="scan-slip__detail-label">{t?.sender}</span>
               <span className="scan-slip__detail-value">{tx.sender_name}</span>
               {tx.sender_account && (
                 <span className="scan-slip__detail-sub">{tx.sender_account}</span>
@@ -406,9 +426,8 @@ function SingleResult({ result, form, setForm, onConfirm, onRetry, t }) {
         {/* To */}
         {(tx.receiver_name || tx.receiver_account) && (
           <div className="scan-slip__detail-row">
-            <span className="scan-slip__detail-icon">🏢</span>
             <div className="scan-slip__detail-body">
-              <span className="scan-slip__detail-label">{t?.receiver || 'ไปยัง'}{tx.receiver_bank ? ` · ${tx.receiver_bank}` : ''}</span>
+              <span className="scan-slip__detail-label">{t?.receiver}{tx.receiver_bank ? ` · ${tx.receiver_bank}` : ''}</span>
               <span className="scan-slip__detail-value">{tx.receiver_name}</span>
               {tx.receiver_account && (
                 <span className="scan-slip__detail-sub">{tx.receiver_account}</span>
@@ -419,11 +438,10 @@ function SingleResult({ result, form, setForm, onConfirm, onRetry, t }) {
 
         {/* Amount */}
         <div className="scan-slip__detail-row scan-slip__detail-row--amount">
-          <span className="scan-slip__detail-icon">💰</span>
           <div className="scan-slip__detail-body">
-            <span className="scan-slip__detail-label">{t?.amount || 'จำนวนเงิน'}</span>
+            <span className="scan-slip__detail-label">{t?.amount}</span>
             <span className="scan-slip__detail-amount">
-              ฿{Number(tx.amount || 0).toLocaleString('th-TH', { minimumFractionDigits: 2 })}
+              ฿{Number(tx.amount || 0).toLocaleString(t?.localeTag || 'th-TH', { minimumFractionDigits: 2 })}
             </span>
           </div>
         </div>
@@ -441,22 +459,22 @@ function SingleResult({ result, form, setForm, onConfirm, onRetry, t }) {
         )}
 
         {/* Refs */}
-        <SlipDetailRow icon="🔖" label={t?.refId || 'เลขอ้างอิง'} value={tx.ref_id} />
-        <SlipDetailRow icon="🏷️" label={t?.ref2 || 'รหัสลูกค้า / Ref.2'} value={tx.ref_id2} />
+        <SlipDetailRow icon="" label={t?.refId} value={tx.ref_id} />
+        <SlipDetailRow icon="" label={t?.ref2} value={tx.ref_id2} />
 
         {/* Address */}
-        <SlipDetailRow icon="📍" label={t?.address || 'ที่อยู่'} value={tx.address} />
+        <SlipDetailRow icon="" label={t?.address} value={tx.address} />
 
         {/* Note from slip */}
-        <SlipDetailRow icon="📝" label={t?.slipNote || 'หมายเหตุจากสลิป'} value={tx.note} />
+        <SlipDetailRow icon="" label={t?.slipNote} value={tx.note} />
       </div>
 
       {/* ── Editable Form ─────────────────────────────── */}
       <div className="scan-slip__result-card">
-        <p className="scan-slip__result-label">{t?.editBeforeSave || 'แก้ไขก่อนบันทึก'}</p>
+        <p className="scan-slip__result-label">{t?.editBeforeSave}</p>
 
         <div className="scan-slip__form-row">
-          <label className="scan-slip__label">{t?.thAmount || 'จำนวนเงิน'} (฿)</label>
+          <label className="scan-slip__label">{t?.thAmount} (฿)</label>
           <input
             className="scan-slip__input"
             type="number"
@@ -467,7 +485,7 @@ function SingleResult({ result, form, setForm, onConfirm, onRetry, t }) {
         </div>
 
         <div className="scan-slip__form-row">
-          <label className="scan-slip__label">{t?.thCategory || 'หมวดหมู่'}</label>
+          <label className="scan-slip__label">{t?.thCategory}</label>
           <select
             className="scan-slip__input scan-slip__select"
             value={form?.category ?? 'Other'}
@@ -482,7 +500,7 @@ function SingleResult({ result, form, setForm, onConfirm, onRetry, t }) {
         </div>
 
         <div className="scan-slip__form-row">
-          <label className="scan-slip__label">{t?.thDate || 'วันที่'}</label>
+          <label className="scan-slip__label">{t?.thDate}</label>
           <input
             className="scan-slip__input"
             type="date"
@@ -492,26 +510,26 @@ function SingleResult({ result, form, setForm, onConfirm, onRetry, t }) {
         </div>
 
         <div className="scan-slip__form-row">
-          <label className="scan-slip__label">{t?.note || 'หมายเหตุ'}</label>
+          <label className="scan-slip__label">{t?.note}</label>
           <input
             className="scan-slip__input"
             type="text"
             value={form?.note ?? ''}
             onChange={handleChange('note')}
-            placeholder={t?.noteHint || 'รายละเอียดเพิ่มเติม'}
+            placeholder={t?.noteHint}
           />
         </div>
 
         <div className="scan-slip__result-actions">
           <button className="scan-slip__btn scan-slip__btn--secondary" onClick={onRetry}>
-            {t?.rescan || 'สแกนใหม่'}
+            {t?.rescan}
           </button>
           <button
             className="scan-slip__btn scan-slip__btn--primary"
             onClick={onConfirm}
             disabled={!form?.amount}
           >
-            {t?.saveItem || 'บันทึกรายการ'} ✓
+            {t?.saveItem} ✓
           </button>
         </div>
       </div>
@@ -529,16 +547,16 @@ function BatchScanningProgress({ progress, onCancel, t }) {
     <div className="scan-slip__batch-progress">
       <div className="scan-slip__spinner" />
       <p className="scan-slip__scanning-title">
-        {t?.batchScanning || 'กำลังสแกน'} {current} / {total} {t?.items || 'รูป'}
+        {t?.batchScanning} {current} / {total} {t?.items}
       </p>
       <div className="scan-slip__progress-bar">
         <div className="scan-slip__progress-fill" style={{ width: `${pct}%` }} />
       </div>
       <p className="scan-slip__scanning-hint">
-        {t?.skipped || 'ข้าม'} {skipped} · {t?.errors || 'ผิดพลาด'} {errors}
+        {t?.skipped} {skipped} · {t?.errors} {errors}
       </p>
       <button className="scan-slip__btn scan-slip__btn--ghost" onClick={onCancel}>
-        {t?.cancel || 'ยกเลิก'}
+        {t?.cancel}
       </button>
     </div>
   );
@@ -549,9 +567,9 @@ function BatchResults({ results, selected, onToggle, onSelectAll, onConfirm, onR
     return (
       <div className="scan-slip__error">
         <div className="scan-slip__error-icon">🔍</div>
-        <p className="scan-slip__error-message">{t?.noSlipsFound || 'ไม่พบสลิปในรูปที่เลือก'}</p>
+        <p className="scan-slip__error-message">{t?.noSlipsFound}</p>
         <button className="scan-slip__btn scan-slip__btn--secondary" onClick={onRescan}>
-          {t?.chooseNewImage || 'เลือกรูปใหม่'}
+          {t?.chooseNewImage}
         </button>
       </div>
     );
@@ -561,10 +579,10 @@ function BatchResults({ results, selected, onToggle, onSelectAll, onConfirm, onR
     <div className="scan-slip__batch-results">
       <div className="scan-slip__batch-header">
         <p className="scan-slip__batch-summary">
-          {t?.found || 'พบ'} <strong>{results.length}</strong> {t?.slips || 'สลิป'}
+          {t?.found} <strong>{results.length}</strong> {t?.slips}
         </p>
         <button className="scan-slip__btn scan-slip__btn--ghost scan-slip__btn--sm" onClick={onSelectAll}>
-          {t?.selectAll || 'เลือกทั้งหมด'}
+          {t?.selectAll}
         </button>
       </div>
 
@@ -588,7 +606,7 @@ function BatchResults({ results, selected, onToggle, onSelectAll, onConfirm, onR
                   {CATEGORY_ICONS[transaction.category] ?? '📦'} {transaction.category}
                 </span>
                 <span className="scan-slip__batch-amount">
-                  ฿{Number(transaction.amount).toLocaleString()}
+                  ฿{Number(transaction.amount).toLocaleString(t?.localeTag || 'th-TH')}
                 </span>
                 <span className="scan-slip__batch-date">{transaction.date}</span>
                 {transaction.note && (
@@ -602,14 +620,14 @@ function BatchResults({ results, selected, onToggle, onSelectAll, onConfirm, onR
 
       <div className="scan-slip__result-actions scan-slip__result-actions--sticky">
         <button className="scan-slip__btn scan-slip__btn--secondary" onClick={onRescan}>
-          {t?.chooseNewImage || 'เลือกรูปใหม่'}
+          {t?.chooseNewImage}
         </button>
         <button
           className="scan-slip__btn scan-slip__btn--primary"
           onClick={onConfirm}
           disabled={selected.size === 0}
         >
-          {t?.saveItem || 'บันทึก'} {selected.size > 0 ? `${selected.size} ${t?.items || 'รายการ'}` : ''} ✓
+          {t?.saveItem} {selected.size > 0 ? `${selected.size} ${t?.items}` : ''} ✓
         </button>
       </div>
     </div>

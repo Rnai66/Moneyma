@@ -21,7 +21,7 @@ Privacy Policy URL:
 ## 2. Privacy Policy
 
 - Confirm contact email is:
-  `rnaibro@gmail.com`
+  `naiguitarfolk@gmail.com`
 - Confirm policy content matches the production app build
 - Confirm the policy names `Supabase` for authentication and cloud backup or synchronization if that is the production setup
 - Confirm the crash reporting provider is also named once selected for production
@@ -63,7 +63,7 @@ Privacy Policy URL:
 - Tablet screenshots if required for target devices
 - Category and tags
 - Support email:
-  `rnaibro@gmail.com`
+  `naiguitarfolk@gmail.com`
 
 ## 6. Policy and Access Forms
 

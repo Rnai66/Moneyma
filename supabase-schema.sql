@@ -170,6 +170,95 @@ CREATE POLICY "Users can insert own sync history"
   WITH CHECK (auth.uid() = user_id);
 
 -- ============================================
+-- Products & Multi-Warehouse Stock Table (Business POS)
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS products (
+  id TEXT PRIMARY KEY,
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  sku TEXT NOT NULL,
+  name TEXT NOT NULL,
+  category TEXT DEFAULT 'ทั่วไป',
+  cost DECIMAL(10,2) DEFAULT 0.00,
+  price DECIMAL(10,2) DEFAULT 0.00,
+  stock INTEGER DEFAULT 0,
+  warehouse1 INTEGER DEFAULT 0,
+  warehouse2 INTEGER DEFAULT 0,
+  warehouse3 INTEGER DEFAULT 0,
+  min_stock INTEGER DEFAULT 5,
+  image_url TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+ALTER TABLE products ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Users can view own products" ON products;
+DROP POLICY IF EXISTS "Users can insert own products" ON products;
+DROP POLICY IF EXISTS "Users can update own products" ON products;
+DROP POLICY IF EXISTS "Users can delete own products" ON products;
+
+CREATE POLICY "Users can view own products" ON products FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can insert own products" ON products FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can update own products" ON products FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "Users can delete own products" ON products FOR DELETE USING (auth.uid() = user_id);
+
+-- ============================================
+-- Sales History Table (Completed POS Sales)
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS sales_history (
+  id TEXT PRIMARY KEY,
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  date DATE NOT NULL,
+  customer_name TEXT,
+  customer_tax_id TEXT,
+  total_amount DECIMAL(10,2) NOT NULL,
+  items JSONB,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+ALTER TABLE sales_history ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Users can view own sales history" ON sales_history;
+DROP POLICY IF EXISTS "Users can insert own sales history" ON sales_history;
+DROP POLICY IF EXISTS "Users can update own sales history" ON sales_history;
+DROP POLICY IF EXISTS "Users can delete own sales history" ON sales_history;
+
+CREATE POLICY "Users can view own sales history" ON sales_history FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can insert own sales history" ON sales_history FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can update own sales history" ON sales_history FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "Users can delete own sales history" ON sales_history FOR DELETE USING (auth.uid() = user_id);
+
+-- ============================================
+-- Purchase Order History Table (Completed Stock In POs)
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS po_history (
+  id TEXT PRIMARY KEY,
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  date DATE NOT NULL,
+  target_warehouse TEXT,
+  supplier_name TEXT,
+  supplier_tax_id TEXT,
+  total_amount DECIMAL(10,2) NOT NULL,
+  items JSONB,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+ALTER TABLE po_history ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Users can view own po history" ON po_history;
+DROP POLICY IF EXISTS "Users can insert own po history" ON po_history;
+DROP POLICY IF EXISTS "Users can update own po history" ON po_history;
+DROP POLICY IF EXISTS "Users can delete own po history" ON po_history;
+
+CREATE POLICY "Users can view own po history" ON po_history FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can insert own po history" ON po_history FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can update own po history" ON po_history FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "Users can delete own po history" ON po_history FOR DELETE USING (auth.uid() = user_id);
+
+-- ============================================
 -- Create Indexes for Performance
 -- ============================================
 
@@ -179,6 +268,10 @@ CREATE INDEX IF NOT EXISTS idx_transactions_synced ON transactions(synced);
 CREATE INDEX IF NOT EXISTS idx_error_logs_user_id ON error_logs(user_id);
 CREATE INDEX IF NOT EXISTS idx_budget_limits_user_id ON budget_limits(user_id);
 CREATE INDEX IF NOT EXISTS idx_sync_history_user_id ON sync_history(user_id);
+CREATE INDEX IF NOT EXISTS idx_products_user_id ON products(user_id);
+CREATE INDEX IF NOT EXISTS idx_products_sku ON products(sku);
+CREATE INDEX IF NOT EXISTS idx_sales_history_user_id ON sales_history(user_id);
+CREATE INDEX IF NOT EXISTS idx_po_history_user_id ON po_history(user_id);
 
 -- ============================================
 -- Enable Realtime (Optional - for Phase 2 live sync)
@@ -186,5 +279,6 @@ CREATE INDEX IF NOT EXISTS idx_sync_history_user_id ON sync_history(user_id);
 -- To enable realtime in Supabase Dashboard:
 -- 1. Go to Database → Publications
 -- 2. Click supabase_realtime
--- 3. Toggle ON for: transactions, user_profiles, budget_limits
+-- 3. Toggle ON for: transactions, user_profiles, budget_limits, products, sales_history, po_history
 -- This is optional - the app works fine without it
+

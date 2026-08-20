@@ -186,6 +186,18 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const signInWithGoogle = async () => {
+    try {
+      setError(null);
+      const { error: googleError } = await SupabaseService.signInWithGoogle();
+      if (googleError) throw googleError;
+      return { error: null };
+    } catch (err) {
+      setError(err);
+      return { error: err };
+    }
+  };
+
   const signOut = async () => {
     try {
       setError(null);
@@ -295,6 +307,7 @@ export const AuthProvider = ({ children }) => {
     isDevBypassActive,
     signUp,
     signIn,
+    signInWithGoogle,
     signOut,
     enableDevBypass,
     resetPassword,

@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MoneyMa - รายงานสรุปโครงสร้างราคา สิทธิประโยชน์ และนโยบายการใช้งาน (v2.3.0)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700;800&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #0284c7;
+      --primary-dark: #0369a1;
+      --accent-green: #10b981;
+      --accent-purple: #7c3aed;
+      --accent-amber: #f59e0b;
+      --dark: #0f172a;
+      --slate: #475569;
+      --light-bg: #f8fafc;
+      --border: #e2e8f0;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Sarabun', 'Inter', sans-serif;
+      color: var(--dark);
+      background-color: #f1f5f9;
+      line-height: 1.6;
+      padding: 40px 20px;
+    }
+
+    .container {
+      max-width: 960px;
+      margin: 0 auto;
+      background: #ffffff;
+      padding: 48px;
+      border-radius: 20px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+      border: 1px solid var(--border);
+    }
+
+    /* Header */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      border-bottom: 2px solid var(--border);
+      padding-bottom: 24px;
+      margin-bottom: 32px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-logo {
+      width: 48px;
+      height: 48px;
+      background: linear-gradient(135deg, #0284c7, #0284c7);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-weight: 800;
+      font-size: 24px;
+    }
+
+    .brand-title {
+      font-size: 26px;
+      font-weight: 800;
+      color: var(--dark);
+      letter-spacing: -0.5px;
+    }
+
+    .brand-subtitle {
+      font-size: 14px;
+      color: var(--slate);
+    }
+
+    .doc-meta {
+      text-align: right;
+      font-size: 13px;
+      color: var(--slate);
+    }
+
+    .doc-badge {
+      display: inline-block;
+      background: #e0f2fe;
+      color: #0369a1;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-weight: 700;
+      font-size: 12px;
+      margin-bottom: 6px;
+    }
+
+    /* Section Styling */
+    h2 {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--dark);
+      margin: 32px 0 16px 0;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    h2::before {
+      content: '';
+      display: inline-block;
+      width: 5px;
+      height: 22px;
+      background: var(--primary);
+      border-radius: 4px;
+    }
+
+    p, li {
+      font-size: 14.5px;
+      color: #334155;
+      margin-bottom: 10px;
+    }
+
+    /* Table Styling */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 20px 0;
+      font-size: 13.5px;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.02);
+    }
+
+    th {
+      background-color: #0f172a;
+      color: #ffffff;
+      text-align: left;
+      padding: 14px 16px;
+      font-weight: 600;
+    }
+
+    td {
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border);
+      background: #ffffff;
+    }
+
+    tr:nth-child(even) td {
+      background-color: #f8fafc;
+    }
+
+    .badge-check {
+      color: var(--accent-green);
+      font-weight: 700;
+    }
+
+    .badge-lock {
+      color: #e11d48;
+      font-weight: 600;
+    }
+
+    .badge-highlight {
+      background: #fef3c7;
+      color: #b45309;
+      padding: 2px 8px;
+      border-radius: 6px;
+      font-weight: 700;
+      font-size: 12px;
+    }
+
+    /* Cards */
+    .grid-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 16px;
+      margin: 20px 0;
+    }
+
+    .card {
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 20px;
+      background: #ffffff;
+    }
+
+    .card-pro { border-top: 4px solid var(--accent-green); }
+    .card-lifetime { border-top: 4px solid var(--accent-purple); background: #faf5ff; }
+    .card-business { border-top: 4px solid var(--accent-amber); }
+
+    .card-title {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .card-price {
+      font-size: 22px;
+      font-weight: 800;
+      color: var(--dark);
+      margin-bottom: 12px;
+    }
+
+    .card-price span {
+      font-size: 13px;
+      font-weight: 400;
+      color: var(--slate);
+    }
+
+    /* Highlight Callouts */
+    .callout {
+      background: #f0f9ff;
+      border-left: 4px solid var(--primary);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 20px 0;
+    }
+
+    .callout-title {
+      font-weight: 700;
+      color: var(--primary-dark);
+      margin-bottom: 4px;
+    }
+
+    /* Footer */
+    .footer {
+      margin-top: 48px;
+      border-top: 1px solid var(--border);
+      padding-top: 20px;
+      text-align: center;
+      font-size: 12px;
+      color: var(--slate);
+    }
+
+    /* Print Styles */
+    @media print {
+      body {
+        background: #fff;
+        padding: 0;
+      }
+      .container {
+        box-shadow: none;
+        border: none;
+        padding: 20px;
+        max-width: 100%;
+      }
+      .grid-cards {
+        grid-template-columns: repeat(3, 1fr);
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div class="brand">
+        <div class="brand-logo">M</div>
+        <div>
+          <div class="brand-title">MoneyMa (มณีมา)</div>
+          <div class="brand-subtitle">รายงานสรุปโครงสร้างราคา สิทธิประโยชน์ และนโยบายการใช้งาน</div>
+        </div>
+      </div>
+      <div class="doc-meta">
+        <div class="doc-badge">v2.3.0 Release Report</div>
+        <div>วันที่จัดทำ: 20 สิงหาคม 2026</div>
+        <div>Android Code 19 | iOS Build 7</div>
+      </div>
+    </div>
+
+    <!-- Executive Summary -->
+    <h2>1. สรุปภาพรวมและวัตถุประสงค์ (Executive Summary)</h2>
+    <p>
+      เอกสารนี้สรุปข้อกำหนด นโยบายการจัดสรรสิทธิ์การใช้งาน (Feature Gates) โครงสร้างราคาบนระบบชำระเงิน Stripe/Google Play และผลการอัปเดตระบบ MoneyMa เวอร์ชั่น 2.3.0 เพื่อสร้างรายได้ต่อเนื่องอย่างยั่งยืน และมอบคุณค่าสูงสุดให้แก่ผู้ใช้ทั้งแบบบุคคลและร้านค้า
+    </p>
+
+    <!-- Pricing & Benefits Comparison Table -->
+    <h2>2. ตารางเปรียบเทียบราคา สิทธิประโยชน์ และโควต้า AI</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>ฟีเจอร์ / รายการ</th>
+          <th>Free Plan (หลัง 7 วัน)</th>
+          <th>Pro Plan (฿99/เดือน)</th>
+          <th>Lifetime Pro (฿2,990) 🏆</th>
+          <th>Business Plan (฿499/เดือน)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>รูปแบบการชำระเงิน</strong></td>
+          <td>ฟรีตลอดไป</td>
+          <td>รายเดือน / รายปี</td>
+          <td><span class="badge-highlight">จ่ายครั้งเดียวถาวร</span></td>
+          <td>รายเดือน / รายปี</td>
+        </tr>
+        <tr>
+          <td>🤖 <strong>โควต้า AI สแกน (ต่อวัน)</strong></td>
+          <td>3 ครั้ง / วัน</td>
+          <td><strong>300 ครั้ง / วัน</strong></td>
+          <td><strong>300 ครั้ง / วัน (ถาวร)</strong></td>
+          <td><strong>2,000 ครั้ง / วัน</strong></td>
+        </tr>
+        <tr>
+          <td>🤖 <strong>โควต้า AI สแกน (ต่อเดือน)</strong></td>
+          <td>~50 ครั้ง / เดือน</td>
+          <td><strong>5,000 ครั้ง / เดือน</strong></td>
+          <td><strong>5,000 ครั้ง / เดือน (ถาวร)</strong></td>
+          <td><strong>20,000 ครั้ง / เดือน</strong></td>
+        </tr>
+        <tr>
+          <td>🛒 <strong>POS ขายหน้าร้าน (1 ร้าน)</strong></td>
+          <td><span class="badge-lock">🔒 ล็อก</span></td>
+          <td><span class="badge-check">✓ ได้รับสิทธิ์</span></td>
+          <td><span class="badge-check">✓ ได้รับสิทธิ์ถาวร</span></td>
+          <td><span class="badge-check">✓ ได้รับสิทธิ์</span></td>
+        </tr>
+        <tr>
+          <td>📦 <strong>คลังสินค้าหลัก (คลัง 1)</strong></td>
+          <td><span class="badge-lock">🔒 ล็อก</span></td>
+          <td><span class="badge-check">✓ ได้รับสิทธิ์</span></td>
+          <td><span class="badge-check">✓ ได้รับสิทธิ์ถาวร</span></td>
+          <td><span class="badge-check">✓ ได้รับสิทธิ์</span></td>
+        </tr>
+        <tr>
+          <td>🏬 <strong>Multi-Warehouse (คลัง 2 & 3)</strong></td>
+          <td><span class="badge-lock">🔒 ล็อก</span></td>
+          <td><span class="badge-lock">🔒 ล็อก</span></td>
+          <td><span class="badge-lock">🔒 ล็อก (สำหรับ Business)</span></td>
+          <td><span class="badge-check">✓ ได้รับสิทธิ์เต็ม</span></td>
+        </tr>
+        <tr>
+          <td>♾️ <strong>จำนวนบันทึกรายการ</strong></td>
+          <td>50 รายการ / เดือน</td>
+          <td><strong>ไม่จำกัด (Infinity)</strong></td>
+          <td><strong>ไม่จำกัด (Infinity) ถาวร</strong></td>
+          <td><strong>ไม่จำกัด (Infinity)</strong></td>
+        </tr>
+        <tr>
+          <td>☁️ <strong>Cloud Sync ข้ามอุปกรณ์</strong></td>
+          <td><span class="badge-lock">🔒 ล็อก</span></td>
+          <td><span class="badge-check">✓ ได้รับสิทธิ์</span></td>
+          <td><span class="badge-check">✓ ได้รับสิทธิ์ถาวร</span></td>
+          <td><span class="badge-check">✓ ได้รับสิทธิ์</span></td>
+        </tr>
+        <tr>
+          <td>📄 <strong>Export PDF / Excel Report</strong></td>
+          <td><span class="badge-lock">🔒 ล็อก</span></td>
+          <td><span class="badge-check">✓ ได้รับสิทธิ์</span></td>
+          <td><span class="badge-check">✓ ได้รับสิทธิ์ถาวร</span></td>
+          <td><span class="badge-check">✓ ได้รับสิทธิ์</span></td>
+        </tr>
+        <tr>
+          <td>🏢 <strong>Multi-Workspace / สาขา</strong></td>
+          <td><span class="badge-lock">🔒 ล็อก</span></td>
+          <td><span class="badge-lock">🔒 ล็อก</span></td>
+          <td><span class="badge-lock">🔒 ล็อก</span></td>
+          <td><span class="badge-check">✓ ได้รับสิทธิ์เต็ม</span></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- Plan Detail Cards -->
+    <h2>3. รายละเอียดและจุดเด่นของแต่ละแพ็กเกจ</h2>
+    <div class="grid-cards">
+      <div class="card card-pro">
+        <div class="card-title">Pro Plan</div>
+        <div class="card-price">฿99 <span>/ เดือน (หรือ ฿1,188/ปี)</span></div>
+        <p><strong>เหมาะสำหรับ:</strong> บุคคลทั่วไป และร้านค้าเดี่ยวขนาดเล็ก</p>
+        <ul style="padding-left: 18px; font-size: 13.5px; margin-top: 8px;">
+          <li>สแกน AI สลิป/บิล 300 ครั้ง/วัน</li>
+          <li>บันทึกรายรับ-รายจ่ายไม่จำกัด</li>
+          <li>ระบบ POS หน้าร้าน 1 ร้าน + คลัง 1</li>
+          <li>Cloud Sync และ Export PDF/Excel</li>
+        </ul>
+      </div>
+
+      <div class="card card-lifetime">
+        <div class="card-title" style="color: var(--accent-purple);">Lifetime Pro 🏆</div>
+        <div class="card-price">฿2,990 <span>จ่ายครั้งเดียวถาวร</span></div>
+        <p><strong>เหมาะสำหรับ:</strong> ผู้ใช้ที่ต้องการซื้อขาด ไม่ชอบการตัดเงินซ้ำรายเดือน</p>
+        <ul style="padding-left: 18px; font-size: 13.5px; margin-top: 8px;">
+          <li>ได้สิทธิ์ทุกอย่างของ Pro Plan ถาวร</li>
+          <li>สแกน AI สลิป/บิล 300 ครั้ง/วัน ตลอดชีพ</li>
+          <li>ไม่มีการเรียกเก็บเงินซ้ำในอนาคต</li>
+          <li>ระบบ POS หน้าร้าน 1 ร้าน + คลัง 1 ถาวร</li>
+        </ul>
+      </div>
+
+      <div class="card card-business">
+        <div class="card-title" style="color: #b45309;">Business Plan</div>
+        <div class="card-price">฿499 <span>/ เดือน (หรือ ฿5,988/ปี)</span></div>
+        <p><strong>เหมาะสำหรับ:</strong> ธุรกิจที่มีหลายคลังสินค้า หรือใช้งานหนัก</p>
+        <ul style="padding-left: 18px; font-size: 13.5px; margin-top: 8px;">
+          <li>โควต้า AI สแกนสูงสุด 2,000 ครั้ง/วัน</li>
+          <li>ระบบ Multi-Warehouse (คลัง 1, 2, 3)</li>
+          <li>Multi-Workspace จัดการหลายสาขา</li>
+          <li>API Access & Priority Support</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- 7-Day Trial Logic -->
+    <h2>4. การทำงานของระบบทดลองใช้งานฟรี 7 วัน (7-Day Business Free Trial)</h2>
+    <div class="callout">
+      <div class="callout-title">✓ สิทธิ์ทดลองใช้งาน 7 วันแรกสำหรับทุกบัญชีใหม่:</div>
+      <p style="margin-bottom: 0;">
+        เมื่อผู้ใช้ใหม่เปิดใช้งานแอปครั้งแรก ระบบจะมอบสิทธิ์ <strong>Business Plan ฟรีทันที 7 วัน</strong> (สามารถใช้สแกน AI, ระบบ POS, คลังสินค้า 3 คลัง, Cloud Sync และ Export รายงานได้ครบถ้วน)
+      </p>
+    </div>
+    
+    <p><strong>พฤติกรรมเมื่อครบกำหนด 7 วัน (Trial Expiration):</strong></p>
+    <ol style="padding-left: 20px; font-size: 14px; margin-bottom: 16px;">
+      <li><strong>หากยังไม่ชำระเงิน:</strong> ระบบจะสลับบัญชีลงมาเป็น <strong>Free Plan</strong> โดยอัตโนมัติ</li>
+      <li><strong>ข้อมูลเดิมไม่สูญหาย:</strong> ประวัติรายรับ-รายจ่าย และสต็อกสินค้าเดิมที่เคยบันทึกไว้ยังคงปลอดภัย 100%</li>
+      <li><strong>ฟีเจอร์พรีเมียมถูกล็อก:</strong> ระบบ POS ขายหน้าร้าน, Multi-warehouse, Cloud Sync และ Export PDF/Excel จะถูกล็อก และขึ้นหน้าเตือนแนะนำแพ็กเกจชำระเงิน</li>
+      <li><strong>เมื่อชำระเงินสำเร็จ:</strong> ระบบจะปลดล็อกกลับมาใช้งานฟีเจอร์พรีเมียมได้ทันทีโดยไม่ต้องตั้งค่าใหม่</li>
+    </ol>
+
+    <!-- Stripe Price Mapping -->
+    <h2>5. การอัปเดตระบบชำระเงิน Stripe (Stripe Price IDs in THB)</h2>
+    <p>
+      คีย์ Stripe Price IDs ใหม่สกุลเงินบาท (THB) ที่ได้รับการอัปเดตเข้าสู่ไฟล์ <code>.env</code> และระบบ Backend Webhook มีรายละเอียดดังนี้:
+    </p>
+    <table>
+      <thead>
+        <tr>
+          <th>ชื่อแพ็กเกจ</th>
+          <th>ราคา (THB)</th>
+          <th>Stripe Price ID ในระบบ (.env)</th>
+          <th>ประเภทสัญญา</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Pro Monthly</strong></td>
+          <td>฿99 / เดือน</td>
+          <td><code>price_1U6QirEnxIeHpiy4UXDikpT5</code></td>
+          <td>Recurring (รายเดือน)</td>
+        </tr>
+        <tr>
+          <td><strong>Pro Yearly</strong></td>
+          <td>฿1,188 / ปี</td>
+          <td><code>price_1U6QirEnxIeHpiy4fegQPddT</code></td>
+          <td>Recurring (รายปี)</td>
+        </tr>
+        <tr>
+          <td><strong>Business Monthly</strong></td>
+          <td>฿499 / เดือน</td>
+          <td><code>price_1TTeLREnxIeHpiy4lJAP7XrY</code></td>
+          <td>Recurring (รายเดือน)</td>
+        </tr>
+        <tr>
+          <td><strong>Business Yearly</strong></td>
+          <td>฿5,988 / ปี</td>
+          <td><code>price_1TTeMREnxIeHpiy4EOEeYqy9</code></td>
+          <td>Recurring (รายปี)</td>
+        </tr>
+        <tr>
+          <td><strong>Lifetime Pro</strong></td>
+          <td>฿2,990 จ่ายครั้งเดียว</td>
+          <td><code>price_1U6QirEnxIeHpiy4T7J4qGmt</code></td>
+          <td><strong>One-time (จ่ายครั้งเดียว)</strong></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- UX Improvements -->
+    <h2>6. การปรับปรุงปุ่ม Guest / Demo Mode ในหน้า Login</h2>
+    <p>
+      เพื่อเพิ่มอัตราการอนุมัติแอปบน <strong>Google Play Console & Apple App Store Review (100% Pass)</strong> และลดอัตราการลบแอปทิ้งของผู้ใช้ใหม่ (Drop-off Rate) ได้มีการปรับปรุงหน้า Login ดังนี้:
+    </p>
+    <div style="background: #f8fafc; border: 1px solid var(--border); border-radius: 12px; padding: 18px; margin: 12px 0;">
+      <p style="margin-bottom: 6px;"><strong>ข้อความบนปุ่มหลัก:</strong> 🇹🇭 <code>"ทดลองใช้งานโดยไม่เข้าสู่ระบบ"</code> | 🇬🇧 <code>"Try Demo / Continue as Guest"</code></p>
+      <p style="margin-bottom: 0;"><strong>คำอธิบายชี้แจงใต้ปุ่ม:</strong> <em>"บันทึกข้อมูลในเครื่องทันที สามารถผูกบัญชีเพื่อซิงค์ Cloud ได้ทุกเมื่อ"</em></p>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <p>© 2026 MoneyMa Application. All Rights Reserved. Confidential Document.</p>
+    </div>
+  </div>
+
+</body>
+</html>

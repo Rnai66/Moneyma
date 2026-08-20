@@ -4,9 +4,19 @@ import SupabaseService from '../services/SupabaseService';
 import { useAuth } from '../services/AuthContext';
 import ScanSlip from '../components/ScanSlip';
 import ScanBill from '../components/ScanBill';
+import { useSubscription } from '../SubscriptionContext/SubscriptionContext';
+import UpgradeModal from '../components/UpgradeModal';
+import { Capacitor } from '@capacitor/core';
+import { NATIVE_BILLING_READY } from '../config/billing';
+import { PLANS } from '../SubscriptionContext/SubscriptionService';
 
+/** See App.js — no purchase CTAs on native until Play Billing is live. */
+const CAN_SELL = !Capacitor.isNativePlatform() || NATIVE_BILLING_READY;
 
 const WEB_TRANSACTIONS_KEY = 'webTransactions';
+// อ่านจาก PLANS เสมอ — เคย hardcode 50 ไว้ตรงนี้ ทำให้แก้ config แล้วพฤติกรรมไม่เปลี่ยน
+const FREE_MONTHLY_LIMIT = PLANS.free.limits.transactions_per_month;
+
 function readWebTransactions() {
   try {
     return JSON.parse(localStorage.getItem(WEB_TRANSACTIONS_KEY) || '[]');
@@ -33,6 +43,8 @@ function generateUUID() {
 
 function Transactions({ transactions, onRefresh, t, storageMode }) {
   const { user } = useAuth();
+  const { plan } = useSubscription();
+  const [showUpgrade, setShowUpgrade] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [showScanSlip, setShowScanSlip] = useState(false);
   const [showScanBill, setShowScanBill] = useState(false);
@@ -40,8 +52,8 @@ function Transactions({ transactions, onRefresh, t, storageMode }) {
   const [editingId, setEditingId] = useState(null);
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState('success');
-  const [viewMode, setViewMode] = useState('cards'); // 'cards' | 'table'
-  const [inlineEdit, setInlineEdit] = useState(null); // { id, field, value }
+  const [viewMode, setViewMode] = useState('cards');
+  const [inlineEdit, setInlineEdit] = useState(null);
   const [formData, setFormData] = useState({
     type: 'expense', amount: '', category: '', description: '',
     date: new Date().toISOString().split('T')[0],
@@ -72,10 +84,32 @@ function Transactions({ transactions, onRefresh, t, storageMode }) {
     return acc;
   }, { income: 0, expense: 0 }), [filteredTransactions]);
 
+  const hasActiveFilters = Object.values(filters).some(Boolean);
+
   const resetForm = () => {
     setFormData({ type: 'expense', amount: '', category: '', description: '', date: new Date().toISOString().split('T')[0] });
     setEditingId(null);
     setShowForm(false);
+    document.body.style.overflow = '';
+  };
+
+  const handleOpenScanSlip = () => {
+    setShowScanSlip(true);
+    document.body.style.overflow = 'hidden';
+  };
+
+  const handleCloseScanSlip = () => {
+    setShowScanSlip(false);
+    document.body.style.overflow = '';
+  };
+
+  const handleOpenScanBill = () => {
+    setShowScanBill(true);
+    document.body.style.overflow = 'hidden';
+  };
+
+  const handleCloseScanBill = () => {
+    setShowScanBill(false);
     document.body.style.overflow = '';
   };
 
@@ -88,7 +122,6 @@ function Transactions({ transactions, onRefresh, t, storageMode }) {
     setFormData({ type: tx.type, amount: tx.amount.toString(), category: tx.category, description: tx.description || '', date: tx.date });
     setEditingId(tx.id);
     setShowForm(true);
-    // Prevent body scroll when modal is open
     document.body.style.overflow = 'hidden';
   };
 
@@ -108,22 +141,20 @@ function Transactions({ transactions, onRefresh, t, storageMode }) {
         if (!Number.isFinite(amt) || amt <= 0) {
           throw new Error(t.invalidAmount || 'Invalid amount');
         }
+        const desc = tx.note || tx.description || '';
         return {
           type: tx.type || 'expense',
           amount: amt,
           category: tx.category || 'Other',
-          description: tx.note || tx.description || '',
+          description: desc,
           date: tx.date || new Date().toISOString().split('T')[0],
+          updated_at: new Date().toISOString(),
         };
       });
 
       if (storageMode === 'cloud' && user) {
         for (const tx of itemsToSave) {
           await SupabaseService.addTransaction(user.id, { ...tx, id: generateUUID() });
-        }
-      } else if (window.electronAPI) {
-        for (const tx of itemsToSave) {
-          await window.electronAPI.addTransaction(tx);
         }
       } else {
         const items = readWebTransactions();
@@ -138,8 +169,8 @@ function Transactions({ transactions, onRefresh, t, storageMode }) {
       setStatus('error', `${t.saveFailed || 'Save failed'}${err?.message ? `: ${err.message}` : ''}`);
     } finally {
       setLoading(false);
-      setShowScanSlip(false);
-      setShowScanBill(false);
+      handleCloseScanSlip();
+      handleCloseScanBill();
     }
   };
 
@@ -150,34 +181,27 @@ function Transactions({ transactions, onRefresh, t, storageMode }) {
         setMessage('');
         if (storageMode === 'cloud' && user) {
           await SupabaseService.deleteTransaction(user.id, id);
-        } else if (window.electronAPI) {
-          await window.electronAPI.deleteTransaction(id);
         } else {
           writeWebTransactions(readWebTransactions().filter(tx => tx.id !== id));
         }
         await onRefresh();
         setStatus('success', t.deleteSuccess);
-      }
-      catch (e) {
+      } catch (e) {
         console.error(e);
         setStatus('error', `${t.deleteFailed}${e?.message ? `: ${e.message}` : ''}`);
       } finally { setLoading(false); }
     }
   };
 
-  // ─── Inline cell save ─────────────────────────────────────────────────────
   const handleInlineSave = async (tx) => {
     if (!inlineEdit || inlineEdit.id !== tx.id) return;
     const updatedTx = { ...tx, [inlineEdit.field]: inlineEdit.value };
-    // Reuse handleSubmit logic inline
     try {
       setLoading(true);
-      const data = { ...updatedTx, amount: parseFloat(updatedTx.amount) };
+      const data = { ...updatedTx, amount: parseFloat(updatedTx.amount), updated_at: new Date().toISOString() };
       if (!Number.isFinite(data.amount) || data.amount <= 0) throw new Error(t.invalidAmount);
       if (storageMode === 'cloud' && user) {
         await SupabaseService.updateTransaction(user.id, tx.id, data);
-      } else if (window.electronAPI) {
-        await window.electronAPI.updateTransaction(tx.id, data);
       } else {
         writeWebTransactions(readWebTransactions().map(r => r.id === tx.id ? { ...r, ...data } : r));
       }
@@ -195,131 +219,29 @@ function Transactions({ transactions, onRefresh, t, storageMode }) {
     if (e.key === 'Escape') setInlineEdit(null);
   };
 
-  // ─── Table view renderer ──────────────────────────────────────────────────
-  const renderTableView = () => (
-    <div style={{ overflowX: 'auto' }}>
-      <table style={{
-        width: '100%', borderCollapse: 'collapse',
-        fontSize: '13.5px', lineHeight: '1.4',
-      }}>
-        <thead>
-          <tr style={{ background: 'var(--bg-card-inner)', borderBottom: '2px solid var(--color-border)' }}>
-            {[t.thDate || 'Date', t.thType || 'Type', t.thCategory || 'Category', t.thDescription || 'Description', t.thAmount || 'Amount', ''].map((h, i) => (
-              <th key={h || i} style={{
-                padding: '10px 12px', textAlign: 'left', color: 'var(--color-text-secondary)',
-                fontWeight: '600', whiteSpace: 'nowrap',
-              }}>{h}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {filteredTransactions.length === 0 ? (
-            <tr><td colSpan={6} style={{ padding: '40px', textAlign: 'center', color: 'var(--color-text-secondary)' }}>
-              {t.noResults}
-            </td></tr>
-          ) : filteredTransactions.map(tx => {
-            const isEditRow = inlineEdit?.id === tx.id;
-            const cellStyle = {
-              padding: '9px 12px', borderBottom: '1px solid var(--color-border)',
-              verticalAlign: 'middle', background: isEditRow ? 'var(--bg-card-inner)' : undefined,
-            };
-            const inputCell = (field, type = 'text') => {
-              const val = isEditRow && inlineEdit.field === field ? inlineEdit.value : tx[field] ?? '';
-              const isActive = isEditRow && inlineEdit.field === field;
-              return (
-                <input
-                  type={type}
-                  value={val}
-                  readOnly={!isEditRow}
-                  onClick={() => !isEditRow && handleInlineChange(tx.id, field, tx[field] ?? '')}
-                  onChange={e => handleInlineChange(tx.id, field, e.target.value)}
-                  onKeyDown={e => handleInlineKeyDown(e, tx)}
-                  style={{
-                    background: isActive ? 'var(--bg-input)' : 'transparent',
-                    border: isActive ? '1.5px solid var(--color-accent)' : '1.5px solid transparent',
-                    borderRadius: '6px', padding: '4px 7px', fontSize: '13px',
-                    color: 'var(--color-text-primary)', fontFamily: 'inherit',
-                    width: '100%', boxSizing: 'border-box', cursor: isEditRow ? 'text' : 'pointer',
-                    outline: 'none',
-                  }}
-                />
-              );
-            };
-            return (
-              <tr key={tx.id} style={{ transition: 'background 0.1s' }}
-                onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-card-inner)'}
-                onMouseLeave={e => e.currentTarget.style.background = ''}
-              >
-                <td style={cellStyle}>{inputCell('date', 'date')}</td>
-                <td style={cellStyle}>
-                  {isEditRow && inlineEdit.field === 'type' ? (
-                    <select
-                      value={inlineEdit.value}
-                      onChange={e => handleInlineChange(tx.id, 'type', e.target.value)}
-                      onKeyDown={e => handleInlineKeyDown(e, tx)}
-                      style={{ fontFamily: 'inherit', fontSize: '13px', padding: '4px 6px', borderRadius: '6px', border: '1.5px solid var(--color-accent)', background: 'var(--bg-input)', color: 'var(--color-text-primary)' }}
-                    >
-                      <option value="income">{t.income}</option>
-                      <option value="expense">{t.expense}</option>
-                    </select>
-                  ) : (
-                    <span
-                      onClick={() => handleInlineChange(tx.id, 'type', tx.type)}
-                      className={`type-badge ${tx.type}`}
-                      style={{ cursor: 'pointer' }}
-                    >
-                      {tx.type === 'income' ? `↑ ${t.income}` : `↓ ${t.expense}`}
-                    </span>
-                  )}
-                </td>
-                <td style={cellStyle}>{inputCell('category')}</td>
-                <td style={cellStyle}>{inputCell('description')}</td>
-                <td style={{ ...cellStyle, fontWeight: '600', color: tx.type === 'income' ? 'var(--color-success)' : 'var(--color-danger)', whiteSpace: 'nowrap' }}>
-                  {isEditRow && inlineEdit.field === 'amount' ? inputCell('amount', 'number') : (
-                    <span onClick={() => handleInlineChange(tx.id, 'amount', tx.amount)} style={{ cursor: 'pointer' }}>
-                      {tx.type === 'income' ? '+' : '−'} {formatCurrency(tx.amount)}
-                    </span>
-                  )}
-                </td>
-                <td style={{ ...cellStyle, whiteSpace: 'nowrap' }}>
-                  {isEditRow ? (
-                    <div style={{ display: 'flex', gap: '6px' }}>
-                      <button className="btn" disabled={loading} style={{ padding: '4px 10px', fontSize: '12px', minHeight: '28px' }}
-                        onClick={() => handleInlineSave(tx)}>{t.save || 'Save'} ✓</button>
-                      <button className="btn btn-ghost" style={{ padding: '4px 8px', fontSize: '12px', minHeight: '28px' }}
-                        onClick={() => setInlineEdit(null)}>{t.cancel || 'Cancel'}</button>
-                    </div>
-                  ) : (
-                    <div style={{ display: 'flex', gap: '4px' }}>
-                      <button title={t.edit} onClick={() => handleEdit(tx)} disabled={loading} className="icon-btn">✏️</button>
-                      <button title={t.delete} onClick={() => handleDelete(tx.id)} disabled={loading} className="icon-btn danger">🗑️</button>
-                    </div>
-                  )}
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
-  );
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
       setLoading(true);
       setMessage('');
-      const data = { ...formData, amount: parseFloat(formData.amount) };
+      const data = { ...formData, amount: parseFloat(formData.amount), updated_at: new Date().toISOString() };
       if (!Number.isFinite(data.amount) || data.amount <= 0) {
         throw new Error(t.invalidAmount);
+      }
+
+      if (plan === 'free' && !editingId) {
+        const currentMonth = new Date().toISOString().substring(0, 7);
+        const thisMonthTxns = transactions?.filter(tx => tx.date && tx.date.substring(0, 7) === currentMonth) || [];
+        if (thisMonthTxns.length >= FREE_MONTHLY_LIMIT) {
+          setShowUpgrade(true);
+          setLoading(false);
+          return;
+        }
       }
 
       if (storageMode === 'cloud' && user) {
         if (editingId) { await SupabaseService.updateTransaction(user.id, editingId, data); }
         else { await SupabaseService.addTransaction(user.id, { ...data, id: generateUUID() }); }
-      } else if (window.electronAPI) {
-        if (editingId) { await window.electronAPI.updateTransaction(editingId, data); }
-        else { await window.electronAPI.addTransaction(data); }
       } else {
         const items = readWebTransactions();
         if (editingId) {
@@ -337,13 +259,6 @@ function Transactions({ transactions, onRefresh, t, storageMode }) {
     } finally { setLoading(false); }
   };
 
-  const inputStyle = {
-    padding: '9px 14px', border: '1.5px solid var(--color-border)', borderRadius: '8px',
-    fontSize: '13.5px', fontFamily: 'inherit', background: 'var(--bg-input)',
-    color: 'var(--color-text-primary)', outline: 'none', width: '100%',
-    transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
-  };
-
   const groupedTransactions = useMemo(() => filteredTransactions.reduce((acc, tx) => {
     const key = tx.date;
     if (!acc[key]) acc[key] = [];
@@ -356,189 +271,333 @@ function Transactions({ transactions, onRefresh, t, storageMode }) {
     [groupedTransactions]
   );
 
-  const statusStyle = messageType === 'error'
-    ? {
-      background: 'rgba(217,79,104,0.12)',
-      border: '1px solid rgba(217,79,104,0.22)',
-      color: 'var(--color-danger)',
-    }
-    : {
-      background: 'rgba(14,159,110,0.12)',
-      border: '1px solid rgba(14,159,110,0.22)',
-      color: 'var(--color-success)',
-    };
+  const thisMonthTxnsCount = useMemo(() => {
+    const currentMonth = new Date().toISOString().substring(0, 7);
+    return transactions?.filter(tx => tx.date && tx.date.substring(0, 7) === currentMonth).length || 0;
+  }, [transactions]);
+
+  const hasTxQuota = Number.isFinite(FREE_MONTHLY_LIMIT);
+  const quotaPercent = hasTxQuota ? Math.min(100, (thisMonthTxnsCount / FREE_MONTHLY_LIMIT) * 100) : 0;
+  const quotaTone = quotaPercent >= 100 ? 'is-danger' : quotaPercent >= 80 ? 'is-warning' : '';
+
+  /* ── table view ─────────────────────────────────────────────── */
+  const renderTableView = () => (
+    <div className="table-wrap">
+      <table className="data-table">
+        <thead>
+          <tr>
+            <th style={{ width: '132px' }}>{t.thDate || 'Date'}</th>
+            <th style={{ width: '128px' }}>{t.thType || 'Type'}</th>
+            <th style={{ width: '20%' }}>{t.thCategory || 'Category'}</th>
+            <th>{t.thDescription || 'Description'}</th>
+            <th className="is-num" style={{ width: '150px' }}>{t.thAmount || 'Amount'}</th>
+            <th className="is-center" style={{ width: '104px' }} />
+          </tr>
+        </thead>
+        <tbody>
+          {filteredTransactions.length === 0 ? (
+            <tr>
+              <td colSpan={6}>
+                <div className="empty-state">
+                  <div className="empty-state-icon" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}><svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></div>
+                  <strong>{t.noResults}</strong>
+                </div>
+              </td>
+            </tr>
+          ) : filteredTransactions.map(tx => {
+            const isEditRow = inlineEdit?.id === tx.id;
+
+            const inputCell = (field, type = 'text') => {
+              const val = isEditRow && inlineEdit.field === field ? inlineEdit.value : tx[field] ?? '';
+              const isActive = isEditRow && inlineEdit.field === field;
+              return (
+                <input
+                  type={type}
+                  value={val}
+                  readOnly={!isEditRow}
+                  className={`inline-cell ${isActive ? 'is-active' : ''}`}
+                  onClick={() => !isEditRow && handleInlineChange(tx.id, field, tx[field] ?? '')}
+                  onChange={e => handleInlineChange(tx.id, field, e.target.value)}
+                  onKeyDown={e => handleInlineKeyDown(e, tx)}
+                />
+              );
+            };
+
+            return (
+              <tr key={tx.id} className={isEditRow ? 'is-editing' : ''}>
+                <td>{inputCell('date', 'date')}</td>
+                <td>
+                  {isEditRow && inlineEdit.field === 'type' ? (
+                    <select
+                      className="inline-cell is-active"
+                      value={inlineEdit.value}
+                      onChange={e => handleInlineChange(tx.id, 'type', e.target.value)}
+                      onKeyDown={e => handleInlineKeyDown(e, tx)}
+                    >
+                      <option value="income">{t.income}</option>
+                      <option value="expense">{t.expense}</option>
+                    </select>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => handleInlineChange(tx.id, 'type', tx.type)}
+                      className={`type-badge ${tx.type}`}
+                      style={{ cursor: 'pointer', border: 'none' }}
+                    >
+                      {tx.type === 'income' ? `↑ ${t.income}` : `↓ ${t.expense}`}
+                    </button>
+                  )}
+                </td>
+                <td>{inputCell('category')}</td>
+                <td className="is-truncate">{inputCell('description')}</td>
+                <td
+                  className="is-num num"
+                  style={{ fontWeight: 700, color: tx.type === 'income' ? 'var(--color-success)' : 'var(--color-danger)' }}
+                >
+                  {isEditRow && inlineEdit.field === 'amount' ? inputCell('amount', 'number') : (
+                    <button
+                      type="button"
+                      className="cell-btn"
+                      onClick={() => handleInlineChange(tx.id, 'amount', tx.amount)}
+                    >
+                      {tx.type === 'income' ? '+' : '−'} {formatCurrency(tx.amount)}
+                    </button>
+                  )}
+                </td>
+                <td className="is-center">
+                  {isEditRow ? (
+                    <div className="cluster" style={{ gap: 'var(--space-1)', justifyContent: 'center', flexWrap: 'nowrap' }}>
+                      <button className="btn btn-sm" disabled={loading} onClick={() => handleInlineSave(tx)}>✓</button>
+                      <button className="btn btn-sm btn-ghost" onClick={() => setInlineEdit(null)} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="cluster" style={{ gap: 'var(--space-1)', justifyContent: 'center', flexWrap: 'nowrap' }}>
+                      <button title={t.edit} onClick={() => handleEdit(tx)} disabled={loading} className="icon-btn" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                      </button>
+                      <button title={t.delete} onClick={() => handleDelete(tx.id)} disabled={loading} className="icon-btn danger" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+                      </button>
+                    </div>
+                  )}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+        {filteredTransactions.length > 0 && (
+          <tfoot>
+            <tr>
+              <td colSpan={4}>{t.showingOf
+                .replace('{shown}', filteredTransactions.length)
+                .replace('{total}', transactions?.length || 0)}</td>
+              <td className="is-num num" style={{ color: totals.income - totals.expense >= 0 ? 'var(--color-success)' : 'var(--color-danger)' }}>
+                {formatCurrency(totals.income - totals.expense)}
+              </td>
+              <td />
+            </tr>
+          </tfoot>
+        )}
+      </table>
+    </div>
+  );
 
   return (
-    <div className="transactions-container">
-      <div className="page-heading">
+    <div className="transactions-container page--wide">
+      <header className="page-heading">
         <div>
-          <span className="eyebrow">{t.filters}</span>
+          <span className="eyebrow">{t.transactionsTitle}</span>
           <h1>{t.transactionsTitle}</h1>
           <p>{t.totalRecords.replace('{n}', transactions?.length || 0)}</p>
         </div>
-        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
-          {/* View toggle */}
-          <div style={{ display: 'flex', border: '1.5px solid var(--color-border)', borderRadius: '8px', overflow: 'hidden' }}>
-            <button
-              onClick={() => setViewMode('cards')}
-              style={{
-                padding: '6px 12px', fontSize: '13px', fontWeight: '600', border: 'none', cursor: 'pointer',
-                background: viewMode === 'cards' ? 'var(--color-accent, #3b82f6)' : 'transparent',
-                color: viewMode === 'cards' ? '#fff' : 'var(--color-text-secondary)',
-                transition: 'all 0.15s',
-              }}
-            >☰ {t.viewCards || 'Cards'}</button>
-            <button
-              onClick={() => { setViewMode('table'); setInlineEdit(null); }}
-              style={{
-                padding: '6px 12px', fontSize: '13px', fontWeight: '600', border: 'none', cursor: 'pointer',
-                background: viewMode === 'table' ? 'var(--color-accent, #3b82f6)' : 'transparent',
-                color: viewMode === 'table' ? '#fff' : 'var(--color-text-secondary)',
-                transition: 'all 0.15s',
-              }}
-            >⊞ {t.viewTable || 'Table'}</button>
-          </div>
-          <button
-            className="btn scan-slip-btn"
-            onClick={() => setShowScanSlip(true)}
-            disabled={loading}
-            style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
-          >
-            📷 {t.scanSlip || 'Scan Slip'}
+      </header>
+
+      {/* action bar: primary action left, scan tiles centre, view switch right */}
+      <section className="toolbar">
+        <button className="btn btn-primary-lg" onClick={handleNewTransaction} disabled={loading}>
+          <span className="btn-plus">+</span>
+          {t.newTransaction}
+        </button>
+
+        <span className="toolbar-divider" aria-hidden="true" />
+
+        <div className="scan-actions">
+          <button className="action-tile action-tile--slip" onClick={handleOpenScanSlip} disabled={loading}>
+            <span className="action-tile-icon" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+            </span>
+            <span className="action-tile-copy">
+              <strong>{t.scanSlip || 'Scan Slip'}</strong>
+              <small>{t.scanSlipCardDesc}</small>
+            </span>
           </button>
-          <button
-            className="btn scan-bill-btn"
-            onClick={() => setShowScanBill(true)}
-            disabled={loading}
-            style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
-          >
-            🧾 {t.scanBill || 'Scan Bill'}
-          </button>
-          <button className="btn" onClick={handleNewTransaction} disabled={loading}>
-            {t.newTransaction}
+
+          <button className="action-tile action-tile--bill" onClick={handleOpenScanBill} disabled={loading}>
+            <span className="action-tile-icon" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1-2-1z"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="10" x2="16" y2="10"/><line x1="8" y1="14" x2="13" y2="14"/></svg>
+            </span>
+            <span className="action-tile-copy">
+              <strong>{t.scanBill || 'Scan Bill'}</strong>
+              <small>{t.scanBillCardDesc}</small>
+            </span>
           </button>
         </div>
-      </div>
 
-      <div className="metrics-strip">
+        <div className="toolbar-end">
+          <div className="view-switch" role="group" aria-label={t.viewCards + ' / ' + t.viewTable}>
+            <button
+              type="button"
+              aria-pressed={viewMode === 'cards'}
+              className={viewMode === 'cards' ? 'is-active' : ''}
+              onClick={() => setViewMode('cards')}
+              title={t.viewCards || 'Cards'}
+            >
+              <span className="view-switch-icon" aria-hidden="true" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="7" rx="2"/><rect x="3" y="14" width="18" height="7" rx="2"/></svg>
+              </span>
+              <span className="view-switch-label">{t.viewCards || 'Cards'}</span>
+            </button>
+            <button
+              type="button"
+              aria-pressed={viewMode === 'table'}
+              className={viewMode === 'table' ? 'is-active' : ''}
+              onClick={() => { setViewMode('table'); setInlineEdit(null); }}
+              title={t.viewTable || 'Table'}
+            >
+              <span className="view-switch-icon" aria-hidden="true" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/></svg>
+              </span>
+              <span className="view-switch-label">{t.viewTable || 'Table'}</span>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {/* แถบโควตารายการ — แสดงเฉพาะเมื่อยังมีเพดานจริง
+          ตอนนี้ free ใช้ transactions_per_month: Infinity แถบนี้จึงถูกซ่อน
+          (ไม่งั้นจะขึ้น "0 / Infinity")
+          เพดานที่บังคับจริงของ free ตอนนี้คือจำนวนสแกน AI ซึ่งแสดงอยู่ในหน้า Settings */}
+      {plan === 'free' && hasTxQuota && (
+        <section className="quota-banner">
+          <div className="quota-banner-copy">
+            <span className="quota-banner-icon" style={{ display: 'inline-flex', alignItems: 'center' }}>
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+            </span>
+            <div>
+              <strong>{t.freeQuotaTitle}</strong>
+              <p>
+                {t.freeQuotaUsed.replace('{n}', thisMonthTxnsCount).replace('{max}', FREE_MONTHLY_LIMIT)}
+              </p>
+              <div className="progress" style={{ marginTop: 'var(--space-2)' }}>
+                <div className={`progress-fill ${quotaTone}`} style={{ width: `${quotaPercent}%` }} />
+              </div>
+            </div>
+          </div>
+          {CAN_SELL && (
+            <button className="btn btn-sm" onClick={() => setShowUpgrade(true)}>{t.upgradeToPro}</button>
+          )}
+        </section>
+      )}
+
+      <section className="metrics-strip">
         <div className="metric-tile income">
           <span>{t.totalIncome}</span>
-          <strong>{formatCurrency(totals.income)}</strong>
+          <strong className="num">{formatCurrency(totals.income)}</strong>
         </div>
         <div className="metric-tile expense">
           <span>{t.totalExpense}</span>
-          <strong>{formatCurrency(totals.expense)}</strong>
+          <strong className="num">{formatCurrency(totals.expense)}</strong>
         </div>
-      </div>
+        <div className="metric-tile">
+          <span>{t.netBalance}</span>
+          <strong
+            className="num"
+            style={{ color: totals.income - totals.expense >= 0 ? 'var(--accent-primary)' : 'var(--color-danger)' }}
+          >
+            {formatCurrency(totals.income - totals.expense)}
+          </strong>
+        </div>
+        <div className="metric-tile">
+          <span>{t.storageMode}</span>
+          <strong style={{ fontSize: 'var(--text-md)' }}>{t.storageBrowser}</strong>
+        </div>
+      </section>
 
       {message && (
-        <div style={{ ...statusStyle, padding: '14px 16px', borderRadius: '14px', fontSize: '14px', fontWeight: '600' }}>
+        <div className={`alert ${messageType === 'error' ? 'alert-danger' : 'alert-success'}`}>
           {message}
         </div>
       )}
 
-      <div style={{
-        padding: '10px 14px',
-        background: 'var(--bg-card-inner)',
-        borderRadius: '12px',
-        border: '1px solid var(--color-border)',
-        color: 'var(--color-text-secondary)',
-        fontSize: '13px',
-        fontWeight: '500',
-      }}>
-        {t.storageMode}: {window.electronAPI ? t.storageDesktop : t.storageBrowser}
-      </div>
+      {showScanSlip && createPortal(
+        <>
+          <div className="sheet-backdrop" onClick={handleCloseScanSlip} />
+          <div className="sheet scan-modal-sheet" role="dialog" aria-modal="true">
+            <div className="sheet-handle" />
+            <ScanSlip t={t} onClose={handleCloseScanSlip} onTransactionCreate={handleScanTransactions} />
+          </div>
+        </>,
+        document.body
+      )}
 
-      {/* Scan Slip Modal */}
-      {showScanSlip && (
-        <ScanSlip
-          t={t}
-          onClose={() => setShowScanSlip(false)}
-          onTransactionCreate={handleScanTransactions}
-        />
+      {showScanBill && createPortal(
+        <>
+          <div className="sheet-backdrop" onClick={handleCloseScanBill} />
+          <div className="sheet scan-modal-sheet" role="dialog" aria-modal="true">
+            <div className="sheet-handle" />
+            <ScanBill t={t} onTransactionCreate={handleScanTransactions} onClose={handleCloseScanBill} />
+          </div>
+        </>,
+        document.body
       )}
-      {/* Scan Bill Modal */}
-      {showScanBill && (
-        <ScanBill
-          t={t}
-          onTransactionCreate={handleScanTransactions}
-          onClose={() => setShowScanBill(false)}
-        />
-      )}
-      {/* Bottom-sheet modal for add/edit */}
+
       {showForm && createPortal(
         <>
-          {/* Backdrop */}
-          <div
-            onClick={resetForm}
-            style={{
-              position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
-              zIndex: 9999, backdropFilter: 'blur(2px)',
-            }}
-          />
-          {/* Sheet */}
-          <div style={{
-            position: 'fixed', left: 0, right: 0, bottom: 0,
-            background: 'var(--bg-card)',
-            borderRadius: '20px 20px 0 0',
-            boxShadow: '0 -8px 40px rgba(0,0,0,0.3)',
-            zIndex: 10000,
-            padding: '24px 24px 40px',
-            maxHeight: '90dvh',
-            maxWidth: '600px',
-            margin: '0 auto',
-            overflowY: 'auto',
-            animation: 'slideUp 0.25s ease',
-          }}>
-            {/* Drag handle */}
-            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
-              <div style={{ width: '40px', height: '4px', borderRadius: '2px', background: 'var(--color-border)' }} />
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '0 0 24px' }}>
-              <h3 style={{ margin: 0, fontWeight: '700', fontSize: '18px', color: 'var(--color-text-primary)', letterSpacing: '-0.02em' }}>
-                {editingId ? t.editTransaction : t.newTransaction}
-              </h3>
-              <button
-                type="submit"
-                form="transaction-form"
-                className="btn"
-                disabled={loading}
-                style={{ padding: '8px 16px', fontSize: '14px', minHeight: '36px', minWidth: '90px' }}
-              >
-                {loading ? t.saving : editingId ? t.updateBtn : t.addTransactionBtn}
+          <div className="sheet-backdrop" onClick={resetForm} />
+          <div className="sheet" role="dialog" aria-modal="true">
+            <div className="sheet-handle" />
+            <div className="sheet-header">
+              <h3>{editingId ? t.editTransaction : t.newTransaction}</h3>
+              <button type="button" className="icon-btn" onClick={resetForm} aria-label={t.cancel} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
               </button>
             </div>
-            <form id="transaction-form" onSubmit={handleSubmit} style={{ display: 'grid', gap: '20px' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px' }}>
-                <div className="filter-group">
+
+            <form id="transaction-form" onSubmit={handleSubmit} className="stack-lg">
+              <div className="filter-bar">
+                <div className="field">
                   <label>{t.formType}</label>
-                  <select value={formData.type} onChange={e => setFormData({ ...formData, type: e.target.value })} disabled={loading} style={inputStyle}>
+                  <select value={formData.type} onChange={e => setFormData({ ...formData, type: e.target.value })} disabled={loading}>
                     <option value="income">{t.income}</option>
                     <option value="expense">{t.expense}</option>
                   </select>
                 </div>
-                <div className="filter-group">
+                <div className="field">
                   <label>{t.formAmount}</label>
-                  <input type="number" step="0.01" placeholder="0.00" value={formData.amount} onChange={e => setFormData({ ...formData, amount: e.target.value })} disabled={loading} required style={inputStyle} />
+                  <input type="number" step="0.01" placeholder="0.00" value={formData.amount} onChange={e => setFormData({ ...formData, amount: e.target.value })} disabled={loading} required />
                 </div>
-                <div className="filter-group">
+                <div className="field">
                   <label>{t.formCategory}</label>
-                  <input type="text" placeholder={t.formCategoryPlaceholder} value={formData.category} onChange={e => setFormData({ ...formData, category: e.target.value })} disabled={loading} required style={inputStyle} />
+                  <input type="text" placeholder={t.formCategoryPlaceholder} value={formData.category} onChange={e => setFormData({ ...formData, category: e.target.value })} disabled={loading} required />
                 </div>
-                <div className="filter-group">
+                <div className="field">
                   <label>{t.formDate}</label>
-                  <input type="date" value={formData.date} onChange={e => setFormData({ ...formData, date: e.target.value })} disabled={loading} required style={inputStyle} />
+                  <input type="date" value={formData.date} onChange={e => setFormData({ ...formData, date: e.target.value })} disabled={loading} required />
                 </div>
               </div>
-              <div className="filter-group">
+
+              <div className="field">
                 <label>{t.formDescription}</label>
-                <input type="text" placeholder={t.formDescPlaceholder} value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} disabled={loading} style={inputStyle} />
+                <input type="text" placeholder={t.formDescPlaceholder} value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} disabled={loading} />
               </div>
-              <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
-                <button type="submit" className="btn" disabled={loading} style={{ flex: 1, padding: '14px' }}>
+
+              <div className="cluster" style={{ flexWrap: 'nowrap' }}>
+                <button type="submit" className="btn btn-block" disabled={loading}>
                   {loading ? t.saving : editingId ? t.updateBtn : t.addTransactionBtn}
                 </button>
-                <button type="button" className="btn btn-ghost" onClick={resetForm} disabled={loading} style={{ padding: '14px' }}>
+                <button type="button" className="btn btn-ghost" onClick={resetForm} disabled={loading}>
                   {t.cancel}
                 </button>
               </div>
@@ -548,19 +607,24 @@ function Transactions({ transactions, onRefresh, t, storageMode }) {
         document.body
       )}
 
-      <div className="card glass-card" style={{ padding: '20px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', gap: '12px', flexWrap: 'wrap' }}>
+      <section className="panel glass-card">
+        <div className="panel-header" style={{ marginBottom: 'var(--space-4)' }}>
           <span className="section-title-bar">{t.filters}</span>
-          <button className="btn btn-ghost" onClick={() => setFilters({ search: '', type: '', category: '', startDate: '', endDate: '' })} style={{ padding: '6px 14px', fontSize: '12px' }}>
+          <button
+            className="btn btn-sm btn-ghost"
+            onClick={() => setFilters({ search: '', type: '', category: '', startDate: '', endDate: '' })}
+            disabled={!hasActiveFilters}
+          >
             {t.reset}
           </button>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '14px' }}>
-          <div className="filter-group">
+
+        <div className="filter-bar">
+          <div className="field">
             <label>{t.filterSearch}</label>
-            <input type="text" placeholder={t.filterSearchPlaceholder} value={filters.search} onChange={e => setFilters({ ...filters, search: e.target.value })} />
+            <input type="search" placeholder={t.filterSearchPlaceholder} value={filters.search} onChange={e => setFilters({ ...filters, search: e.target.value })} />
           </div>
-          <div className="filter-group">
+          <div className="field">
             <label>{t.filterType}</label>
             <select value={filters.type} onChange={e => setFilters({ ...filters, type: e.target.value })}>
               <option value="">{t.allTypes}</option>
@@ -568,89 +632,104 @@ function Transactions({ transactions, onRefresh, t, storageMode }) {
               <option value="expense">{t.expense}</option>
             </select>
           </div>
-          <div className="filter-group">
+          <div className="field">
             <label>{t.filterCategory}</label>
             <select value={filters.category} onChange={e => setFilters({ ...filters, category: e.target.value })}>
               <option value="">{t.allCategories}</option>
               {categories.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
-          <div className="filter-group">
+          <div className="field">
             <label>{t.filterFrom}</label>
             <input type="date" value={filters.startDate} onChange={e => setFilters({ ...filters, startDate: e.target.value })} />
           </div>
-          <div className="filter-group">
+          <div className="field">
             <label>{t.filterTo}</label>
             <input type="date" value={filters.endDate} onChange={e => setFilters({ ...filters, endDate: e.target.value })} />
           </div>
         </div>
-        <div style={{ marginTop: '16px', padding: '10px 14px', backgroundColor: 'var(--bg-card-inner)', borderRadius: '8px', border: '1px solid var(--color-border)' }}>
-          <span style={{ fontSize: '13px', color: 'var(--color-text-secondary)', fontWeight: '500' }}>
-            {t.showingOf.replace('{shown}', filteredTransactions.length).replace('{total}', transactions?.length || 0)}
-          </span>
-        </div>
-      </div>
 
-      <div className="transactions-list">
-        {viewMode === 'table' ? (
-          <div className="card glass-card" style={{ padding: '0' }}>
-            {renderTableView()}
-          </div>
-        ) : filteredTransactions.length > 0 ? (
+        <p className="result-count">
+          {t.showingOf.replace('{shown}', filteredTransactions.length).replace('{total}', transactions?.length || 0)}
+        </p>
+      </section>
+
+      {viewMode === 'table' ? (
+        <section className="panel card--flush">{renderTableView()}</section>
+      ) : filteredTransactions.length > 0 ? (
+        <section className="transactions-list">
           <div className="transaction-feed">
             {sortedGroupedTransactions.map(([date, items]) => (
-              <section key={date} className="transaction-group">
+              <div key={date} className="transaction-group">
                 <div className="transaction-group-title">
                   <span>{date}</span>
                   <div />
+                  <span className="num">{items.length}</span>
                 </div>
                 <div className="transaction-stack">
                   {items.map(tx => (
                     <article key={tx.id} className="transaction-card-row">
                       <div className="transaction-card-main">
-                        <div className="transaction-avatar" style={{
-                          background: tx.type === 'income'
-                            ? 'linear-gradient(135deg, rgba(78,222,163,0.28), rgba(78,222,163,0.08))'
-                            : 'linear-gradient(135deg, rgba(255,180,171,0.28), rgba(255,180,171,0.08))',
-                          color: tx.type === 'income' ? 'var(--color-success)' : 'var(--color-danger)',
-                        }}>
+                        <div
+                          className="transaction-avatar"
+                          style={{
+                            background: tx.type === 'income' ? 'var(--color-success-soft)' : 'var(--color-danger-soft)',
+                            color: tx.type === 'income' ? 'var(--color-success)' : 'var(--color-danger)',
+                          }}
+                        >
                           {(tx.category || '?').charAt(0)}
                         </div>
                         <div className="transaction-card-copy">
                           <strong>{tx.category}</strong>
-                          <span>{tx.description || t.formDescPlaceholder}</span>
+                          <span>{tx.description || '—'}</span>
                         </div>
                       </div>
                       <div className="transaction-card-side">
                         <span className={`type-badge ${tx.type}`}>
                           {tx.type === 'income' ? `↑ ${t.income}` : `↓ ${t.expense}`}
                         </span>
-                        <strong className={`transaction-amount ${tx.type}`}>
+                        <strong className={`transaction-amount ${tx.type} num`}>
                           {tx.type === 'income' ? '+' : '−'} {formatCurrency(tx.amount)}
                         </strong>
                       </div>
                       <div className="transaction-card-actions">
-                        <button title={t.edit} onClick={() => handleEdit(tx)} disabled={loading} className="icon-btn">✏️</button>
-                        <button title={t.delete} onClick={() => handleDelete(tx.id)} disabled={loading} className="icon-btn danger">🗑️</button>
+                        <button title={t.edit} onClick={() => handleEdit(tx)} disabled={loading} className="icon-btn" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                        </button>
+                        <button title={t.delete} onClick={() => handleDelete(tx.id)} disabled={loading} className="icon-btn danger" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+                        </button>
                       </div>
                     </article>
                   ))}
                 </div>
-              </section>
+              </div>
             ))}
           </div>
-        ) : (
-          <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--color-text-secondary)' }}>
-            <div style={{ fontSize: '36px', opacity: 0.25, marginBottom: '12px' }}>🔍</div>
-            <p style={{ fontWeight: '600', fontSize: '15px', marginBottom: '6px', color: 'var(--color-text-primary)' }}>
-              {t.noResults}
-            </p>
-            <p style={{ fontSize: '13px' }}>
-              {transactions?.length === 0 ? t.addFirstTransaction : t.noResultsHint}
-            </p>
+        </section>
+      ) : (
+        <section className="panel">
+          <div className="empty-state">
+            <div className="empty-state-icon" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}><svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></div>
+            <strong>{t.noResults}</strong>
+            <p>{transactions?.length === 0 ? t.addFirstTransaction : t.noResultsHint}</p>
+            {transactions?.length === 0 && (
+              <button className="btn" style={{ marginTop: 'var(--space-3)' }} onClick={handleNewTransaction}>
+                + {t.newTransaction}
+              </button>
+            )}
           </div>
-        )}
-      </div>
+        </section>
+      )}
+
+      <UpgradeModal
+        isOpen={showUpgrade}
+        onClose={() => setShowUpgrade(false)}
+        title={`⚠️ ${t.txLimitTitle}`}
+        description={t.txLimitDesc}
+        feature="unlimited_tx"
+        t={t}
+      />
     </div>
   );
 }

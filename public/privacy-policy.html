@@ -1,389 +1,436 @@
 <!doctype html>
-<html lang="en">
+<html lang="th">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <meta name="theme-color" content="#0b1220" />
-  <meta name="description" content="Privacy Policy for MoneyMa" />
-  <title>MoneyMa Privacy Policy</title>
+  <meta name="description" content="นโยบายความเป็นส่วนตัว MoneyMa — Privacy Policy" />
+  <title>MoneyMa — นโยบายความเป็นส่วนตัว / Privacy Policy</title>
   <style>
     :root {
       --bg: #0b1220;
-      --panel: rgba(15, 23, 42, 0.82);
-      --panel-strong: rgba(30, 41, 59, 0.95);
+      --panel: rgba(15,23,42,0.82);
+      --panel-strong: rgba(30,41,59,0.95);
       --text: #e5eefc;
       --muted: #a9b7d5;
       --accent: #77a8ff;
       --accent-2: #8ef0c8;
-      --border: rgba(169, 183, 213, 0.18);
-      --shadow: 0 24px 60px rgba(0, 0, 0, 0.28);
+      --border: rgba(169,183,213,0.18);
+      --shadow: 0 24px 60px rgba(0,0,0,0.28);
       color-scheme: dark;
     }
-
-    * {
-      box-sizing: border-box;
-    }
-
+    *, *::before, *::after { box-sizing: border-box; }
     body {
       margin: 0;
       font-family: Manrope, "Noto Sans Thai", "Segoe UI", sans-serif;
       background:
-        radial-gradient(circle at top left, rgba(119, 168, 255, 0.22), transparent 28%),
-        radial-gradient(circle at bottom right, rgba(142, 240, 200, 0.12), transparent 24%),
+        radial-gradient(circle at top left, rgba(119,168,255,0.22), transparent 28%),
+        radial-gradient(circle at bottom right, rgba(142,240,200,0.12), transparent 24%),
         var(--bg);
       color: var(--text);
-      line-height: 1.7;
+      line-height: 1.75;
     }
-
-    .page {
-      max-width: 980px;
-      margin: 0 auto;
-      padding: 32px 20px 72px;
-    }
-
+    .page { max-width: 860px; margin: 0 auto; padding: 32px 20px 72px; }
     .hero {
-      padding: 28px;
+      padding: 32px 28px;
       border-radius: 28px;
-      background:
-        linear-gradient(135deg, rgba(35, 52, 94, 0.95), rgba(17, 24, 39, 0.92));
+      background: linear-gradient(135deg, rgba(35,52,94,0.95), rgba(17,24,39,0.92));
       border: 1px solid var(--border);
       box-shadow: var(--shadow);
     }
-
-    .eyebrow {
+    .badge {
       display: inline-block;
-      font-size: 12px;
-      font-weight: 800;
-      text-transform: uppercase;
-      letter-spacing: 0.16em;
-      color: var(--accent-2);
-      margin-bottom: 10px;
+      font-size: 11px; font-weight: 800;
+      text-transform: uppercase; letter-spacing: 0.14em;
+      color: var(--accent-2); margin-bottom: 10px;
     }
-
-    h1 {
-      margin: 0;
-      font-size: clamp(2rem, 4vw, 3.4rem);
-      line-height: 1.05;
-      letter-spacing: -0.04em;
-    }
-
-    .subtitle {
-      margin: 14px 0 0;
-      color: var(--muted);
-      font-size: 1rem;
-      max-width: 720px;
-    }
-
+    h1 { margin: 0; font-size: clamp(1.8rem,4vw,3rem); line-height: 1.1; letter-spacing: -0.03em; }
+    .subtitle { margin: 12px 0 0; color: var(--muted); font-size: 1rem; max-width: 680px; }
     .updated {
-      margin-top: 18px;
-      display: inline-flex;
-      padding: 9px 14px;
-      border-radius: 999px;
-      background: rgba(119, 168, 255, 0.12);
-      border: 1px solid rgba(119, 168, 255, 0.22);
-      color: var(--text);
-      font-size: 13px;
-      font-weight: 700;
+      margin-top: 16px; display: inline-flex;
+      padding: 8px 14px; border-radius: 999px;
+      background: rgba(119,168,255,0.1); border: 1px solid rgba(119,168,255,0.2);
+      color: var(--text); font-size: 13px; font-weight: 700;
     }
-
-    .toc,
-    .content section {
-      margin-top: 22px;
-      padding: 24px;
-      border-radius: 24px;
-      background: var(--panel);
-      border: 1px solid var(--border);
-      box-shadow: var(--shadow);
-      backdrop-filter: blur(18px);
+    .lang-switch {
+      margin-top: 18px; display: flex; gap: 8px;
     }
-
-    .toc h2,
-    .content h2 {
-      margin: 0 0 14px;
-      font-size: 1.2rem;
-      letter-spacing: -0.02em;
+    .lang-btn {
+      padding: 6px 16px; border-radius: 999px; border: 1px solid var(--border);
+      background: transparent; color: var(--muted); font-size: 13px; font-weight: 700;
+      cursor: pointer; transition: all 0.2s;
     }
-
-    .content h3 {
-      margin: 18px 0 8px;
-      font-size: 1rem;
-      color: var(--accent);
+    .lang-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+    nav.toc, .content section {
+      margin-top: 20px; padding: 24px; border-radius: 24px;
+      background: var(--panel); border: 1px solid var(--border);
+      box-shadow: var(--shadow); backdrop-filter: blur(18px);
     }
-
-    p {
-      margin: 10px 0;
-      color: var(--text);
-    }
-
-    ul {
-      margin: 10px 0 0;
-      padding-left: 20px;
-      color: var(--muted);
-    }
-
-    li + li {
-      margin-top: 8px;
-    }
-
-    .toc ol {
-      margin: 0;
-      padding-left: 20px;
-      color: var(--muted);
-    }
-
-    .toc a {
-      color: var(--text);
-      text-decoration: none;
-    }
-
-    .toc a:hover {
-      color: var(--accent-2);
-    }
-
+    nav.toc h2, .content h2 { margin: 0 0 12px; font-size: 1.15rem; letter-spacing: -0.02em; }
+    .content h3 { margin: 18px 0 6px; font-size: 0.95rem; color: var(--accent); font-weight: 700; }
+    p { margin: 10px 0; }
+    ul { margin: 8px 0; padding-left: 20px; color: var(--muted); }
+    li + li { margin-top: 6px; }
+    nav.toc ol { margin: 0; padding-left: 20px; color: var(--muted); }
+    nav.toc a { color: var(--text); text-decoration: none; }
+    nav.toc a:hover { color: var(--accent-2); }
     .callout {
-      margin-top: 14px;
-      padding: 16px 18px;
-      border-radius: 18px;
-      background: var(--panel-strong);
-      border: 1px solid rgba(142, 240, 200, 0.16);
-      color: var(--muted);
+      margin-top: 14px; padding: 14px 18px; border-radius: 16px;
+      background: var(--panel-strong); border: 1px solid rgba(142,240,200,0.16);
+      color: var(--muted); font-size: 14px;
     }
-
     code {
-      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-      background: rgba(255, 255, 255, 0.06);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 8px;
-      padding: 2px 6px;
-      color: var(--text);
+      font-family: ui-monospace, Menlo, Consolas, monospace;
+      background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 6px; padding: 2px 6px;
     }
-
-    footer {
-      margin-top: 24px;
-      color: var(--muted);
-      font-size: 14px;
-      text-align: center;
-    }
-
+    .lang-content { display: none; }
+    .lang-content.active { display: block; }
+    footer { margin-top: 24px; color: var(--muted); font-size: 13px; text-align: center; }
     @media (max-width: 640px) {
-      .page {
-        padding: 20px 14px 56px;
-      }
-
-      .hero,
-      .toc,
-      .content section {
-        padding: 18px;
-        border-radius: 20px;
-      }
+      .page { padding: 16px 14px 56px; }
+      .hero, nav.toc, .content section { padding: 18px; border-radius: 18px; }
     }
   </style>
 </head>
 <body>
-  <main class="page">
-    <header class="hero">
-      <span class="eyebrow">MoneyMa</span>
-      <h1>Privacy Policy</h1>
-      <p class="subtitle">
-        This Privacy Policy explains what information MoneyMa collects, how it is used,
-        how it may be shared, and the choices available to users.
-      </p>
-      <div class="updated">Last updated: March 21, 2026</div>
-    </header>
+<main class="page">
 
-    <nav class="toc" aria-label="Table of contents">
-      <h2>Contents</h2>
+  <header class="hero">
+    <span class="badge">MoneyMa v2.1.0</span>
+    <h1>Privacy Policy<br><small style="font-size:0.55em;opacity:0.7">นโยบายความเป็นส่วนตัว</small></h1>
+    <p class="subtitle">com.moneyma.app · Personal Finance Manager</p>
+    <div class="updated">Last updated / อัปเดตล่าสุด: 21 May 2026</div>
+    <div class="lang-switch">
+      <button class="lang-btn active" onclick="setLang('th')">🇹🇭 ไทย</button>
+      <button class="lang-btn" onclick="setLang('en')">🇬🇧 English</button>
+    </div>
+  </header>
+
+  <!-- ─── THAI ─────────────────────────────────────────────────── -->
+  <div id="lang-th" class="lang-content active">
+
+    <nav class="toc">
+      <h2>สารบัญ</h2>
       <ol>
-        <li><a href="#section-1">Information We Collect</a></li>
-        <li><a href="#section-2">How We Use Information</a></li>
-        <li><a href="#section-3">How Information Is Stored</a></li>
-        <li><a href="#section-4">How Information Is Shared</a></li>
-        <li><a href="#section-5">Crash Reporting and Diagnostics</a></li>
-        <li><a href="#section-6">Cloud Backup and Synchronization</a></li>
-        <li><a href="#section-7">Login and Account System</a></li>
-        <li><a href="#section-8">Data Retention</a></li>
-        <li><a href="#section-9">Data Security</a></li>
-        <li><a href="#section-10">User Choices and Controls</a></li>
-        <li><a href="#section-11">Children's Privacy</a></li>
-        <li><a href="#section-12">International Data Transfers</a></li>
-        <li><a href="#section-13">Changes to This Privacy Policy</a></li>
-        <li><a href="#section-14">Contact</a></li>
+        <li><a href="#th-1">ข้อมูลที่เราเก็บรวบรวม</a></li>
+        <li><a href="#th-2">วัตถุประสงค์การใช้ข้อมูล</a></li>
+        <li><a href="#th-3">การจัดเก็บข้อมูล</a></li>
+        <li><a href="#th-4">การเปิดเผยข้อมูลแก่บุคคลที่สาม</a></li>
+        <li><a href="#th-5">การสแกนบิลและสลิปด้วย AI</a></li>
+        <li><a href="#th-6">การสำรองข้อมูลบนคลาวด์</a></li>
+        <li><a href="#th-7">ระบบบัญชีผู้ใช้</a></li>
+        <li><a href="#th-8">ระยะเวลาเก็บรักษาข้อมูล</a></li>
+        <li><a href="#th-9">ความปลอดภัยของข้อมูล</a></li>
+        <li><a href="#th-10">สิทธิ์และทางเลือกของผู้ใช้</a></li>
+        <li><a href="#th-11">นโยบายสำหรับเด็ก</a></li>
+        <li><a href="#th-12">การโอนข้อมูลระหว่างประเทศ</a></li>
+        <li><a href="#th-13">การแก้ไขนโยบาย</a></li>
+        <li><a href="#th-14">ติดต่อเรา</a></li>
       </ol>
     </nav>
 
     <div class="content">
-      <section id="section-1">
-        <h2>1. Information We Collect</h2>
-        <p>
-          Depending on how you use MoneyMa, we may collect and process the following categories of information:
-        </p>
-        <h3>Account Information</h3>
+      <section id="th-1">
+        <h2>1. ข้อมูลที่เราเก็บรวบรวม</h2>
+        <p>MoneyMa อาจเก็บข้อมูลต่อไปนี้ขึ้นอยู่กับการใช้งาน:</p>
+        <h3>ข้อมูลบัญชี</h3>
         <ul>
-          <li>Email address</li>
-          <li>User account ID</li>
-          <li>Authentication-related information required to sign in and manage your account</li>
+          <li>ที่อยู่อีเมล</li>
+          <li>รหัสบัญชีผู้ใช้ (User ID)</li>
+          <li>ข้อมูลการยืนยันตัวตนสำหรับการเข้าสู่ระบบ</li>
         </ul>
-        <h3>Financial Information</h3>
+        <h3>ข้อมูลการเงิน</h3>
         <ul>
-          <li>Income and expense records</li>
-          <li>Transaction amounts</li>
-          <li>Categories and budget entries</li>
-          <li>Dates</li>
-          <li>Optional descriptions or notes you choose to enter</li>
+          <li>รายรับและรายจ่ายที่ผู้ใช้บันทึกเอง</li>
+          <li>จำนวนเงิน, หมวดหมู่, งบประมาณ, วันที่</li>
+          <li>หมายเหตุหรือคำอธิบายที่ผู้ใช้กรอกเพิ่มเติม</li>
         </ul>
-        <h3>App Preferences</h3>
+        <h3>การตั้งค่าแอป</h3>
         <ul>
-          <li>Language settings</li>
-          <li>Theme settings</li>
-          <li>Other app configuration preferences stored for your experience</li>
+          <li>ภาษา, ธีม และการตั้งค่าอื่นๆ ในแอป</li>
         </ul>
-        <h3>Backup and Sync Data</h3>
-        <p>
-          When cloud backup or synchronization is enabled, the financial and preference data associated with your account may be uploaded to and stored using Supabase services so it can be backed up and synchronized across devices.
-        </p>
-        <h3>Crash Logs and Diagnostics</h3>
-        <p>
-          We may collect crash logs, error reports, and technical diagnostics to monitor app stability, investigate bugs, and improve performance and reliability.
-        </p>
-      </section>
-
-      <section id="section-2">
-        <h2>2. How We Use Information</h2>
+        <h3>ข้อมูล Crash และ Diagnostics</h3>
         <ul>
-          <li>Creating and managing user accounts</li>
-          <li>Authenticating users and maintaining secure sign-in sessions</li>
-          <li>Storing and displaying financial records</li>
-          <li>Generating summaries, reports, and statistics</li>
-          <li>Supporting backup, restore, and cross-device synchronization</li>
-          <li>Remembering user preferences</li>
-          <li>Detecting, investigating, and fixing crashes or technical issues</li>
-          <li>Protecting the security and integrity of the app and related systems</li>
+          <li>รายงานข้อผิดพลาด, เวอร์ชันแอป, ข้อมูลอุปกรณ์ (เพื่อแก้บั๊ก)</li>
         </ul>
       </section>
 
-      <section id="section-3">
-        <h2>3. How Information Is Stored</h2>
-        <p>MoneyMa may store information in two places depending on the feature being used:</p>
+      <section id="th-2">
+        <h2>2. วัตถุประสงค์การใช้ข้อมูล</h2>
         <ul>
-          <li>Locally on your device, including app storage or app container data</li>
-          <li>On secure cloud systems used for account services, cloud backup, and synchronization</li>
-        </ul>
-        <p>Locally stored data may still remain on your device even when cloud sync is enabled.</p>
-      </section>
-
-      <section id="section-4">
-        <h2>4. How Information Is Shared</h2>
-        <p>We do not sell your personal or financial information.</p>
-        <p>We may share information only in the following limited situations:</p>
-        <ul>
-          <li>With service providers that help us operate authentication, cloud storage, synchronization, hosting, or crash reporting</li>
-          <li>When you explicitly use export, backup, restore, or sharing features</li>
-          <li>When required by law, regulation, legal process, or valid government request</li>
-          <li>To protect the rights, safety, security, or property of users, MoneyMa, or the public</li>
-        </ul>
-        <p>MoneyMa uses Supabase for account authentication and cloud data synchronization. If other third-party infrastructure providers are used, such as a crash reporting provider, they may process data on our behalf under their own security and processing terms.</p>
-      </section>
-
-      <section id="section-5">
-        <h2>5. Crash Reporting and Diagnostics</h2>
-        <p>MoneyMa may use crash reporting or diagnostics tools to understand app failures and improve app quality.</p>
-        <ul>
-          <li>Crash stack traces</li>
-          <li>Device and operating system details</li>
-          <li>App version and build number</li>
-          <li>Performance-related metadata</li>
-          <li>Technical identifiers associated with the app installation or reporting service</li>
-        </ul>
-        <p>We use this information only for debugging, maintenance, reliability, and service improvement.</p>
-      </section>
-
-      <section id="section-6">
-        <h2>6. Cloud Backup and Synchronization</h2>
-        <p>If you sign in and use cloud backup or sync features:</p>
-        <ul>
-          <li>Your financial records and related app data may be transmitted to Supabase-managed infrastructure used for MoneyMa account and sync services</li>
-          <li>Data may be synchronized between devices associated with your account</li>
-          <li>Data may be restored after reinstalling the app or signing in on another supported device</li>
+          <li>สร้างและจัดการบัญชีผู้ใช้</li>
+          <li>แสดงผลและจัดเก็บข้อมูลธุรกรรมทางการเงิน</li>
+          <li>สร้างรายงานสรุปและกราฟวิเคราะห์</li>
+          <li>สำรองและซิงค์ข้อมูลข้ามอุปกรณ์</li>
+          <li>ตรวจสอบและแก้ไขข้อผิดพลาดของแอป</li>
+          <li>ปรับปรุงและพัฒนาแอปอย่างต่อเนื่อง</li>
         </ul>
       </section>
 
-      <section id="section-7">
-        <h2>7. Login and Account System</h2>
-        <p>When you create or use an account, we may process account-related data to:</p>
+      <section id="th-3">
+        <h2>3. การจัดเก็บข้อมูล</h2>
+        <p>ข้อมูลอาจถูกจัดเก็บใน 2 รูปแบบ:</p>
         <ul>
-          <li>Register your account</li>
-          <li>Sign you in securely</li>
-          <li>Identify your synced data across devices</li>
-          <li>Support account recovery, security, and service continuity</li>
-        </ul>
-        <p>MoneyMa uses Supabase Auth to support sign-in, session handling, and account-linked data access.</p>
-      </section>
-
-      <section id="section-8">
-        <h2>8. Data Retention</h2>
-        <p>We retain information for as long as reasonably necessary to provide the service and for legitimate business, security, and legal purposes.</p>
-        <ul>
-          <li>Account information may be retained while your account remains active</li>
-          <li>Cloud backup and synchronization data may be retained until you delete it, delete your account, or request deletion, subject to technical backup retention windows</li>
-          <li>Crash logs and diagnostics may be retained for a limited period necessary for troubleshooting and service improvement</li>
+          <li><strong>บนอุปกรณ์</strong> — เก็บในหน่วยความจำของแอปบนโทรศัพท์/แท็บเล็ต</li>
+          <li><strong>บน Cloud</strong> — เก็บบน Supabase เมื่อเปิดใช้งานฟีเจอร์ซิงค์หรือบัญชีผู้ใช้</li>
         </ul>
       </section>
 
-      <section id="section-9">
-        <h2>9. Data Security</h2>
-        <p>We use reasonable administrative, technical, and organizational measures to protect personal information.</p>
+      <section id="th-4">
+        <h2>4. การเปิดเผยข้อมูลแก่บุคคลที่สาม</h2>
+        <p><strong>เราไม่ขายข้อมูลส่วนตัวของคุณ</strong></p>
+        <p>เราอาจแบ่งปันข้อมูลในกรณีต่อไปนี้เท่านั้น:</p>
         <ul>
-          <li>Secure transmission methods such as HTTPS/TLS</li>
-          <li>Access controls</li>
-          <li>Authentication safeguards</li>
-          <li>Controlled infrastructure and service-provider access</li>
+          <li><strong>Supabase</strong> — ระบบฐานข้อมูลและการยืนยันตัวตน</li>
+          <li><strong>Google Gemini AI</strong> — ประมวลผลรูปภาพสลิปและบิลชั่วคราว (ไม่เก็บรูปถาวร)</li>
+          <li><strong>Firebase (Google)</strong> — รายงาน crash, analytics (ไม่มีข้อมูลการเงิน)</li>
+          <li>เมื่อกฎหมายกำหนดหรือมีคำสั่งศาล</li>
         </ul>
-        <p>However, no method of storage, transmission, or electronic processing is completely secure, and we cannot guarantee absolute security.</p>
       </section>
 
-      <section id="section-10">
-        <h2>10. User Choices and Controls</h2>
+      <section id="th-5">
+        <h2>5. การสแกนบิลและสลิปด้วย AI</h2>
+        <p>เมื่อคุณใช้ฟีเจอร์สแกนสลิปหรือบิล:</p>
         <ul>
-          <li>Edit or delete records within the app</li>
-          <li>Export your data</li>
-          <li>Restore data from a backup</li>
-          <li>Enable or disable certain backup or sync features</li>
-          <li>Sign out of your account</li>
-          <li>Request deletion of your account or associated cloud data</li>
-          <li>Uninstall the app and remove local app data from your device</li>
+          <li>รูปภาพจะถูกส่งไปยัง Google Gemini AI <strong>เพื่อประมวลผลชั่วคราวเท่านั้น</strong></li>
+          <li>เราไม่เก็บรูปภาพของคุณไว้บนเซิร์ฟเวอร์ของเรา</li>
+          <li>ข้อมูลที่อ่านได้จากสลิปจะถูกนำเข้าแอปเพื่อให้คุณตรวจสอบก่อนบันทึก</li>
+          <li>กล้องใช้สำหรับฟีเจอร์นี้เท่านั้น ไม่มีการบันทึกวิดีโอหรือถ่ายภาพโดยไม่ได้รับอนุญาต</li>
+        </ul>
+      </section>
+
+      <section id="th-6">
+        <h2>6. การสำรองข้อมูลบนคลาวด์</h2>
+        <p>หากคุณเข้าสู่ระบบและเปิดใช้งาน Cloud Sync:</p>
+        <ul>
+          <li>ข้อมูลธุรกรรมและการตั้งค่าจะถูกส่งไปเก็บบน Supabase</li>
+          <li>ข้อมูลสามารถซิงค์ข้ามอุปกรณ์ที่ใช้บัญชีเดียวกัน</li>
+          <li>คุณสามารถกู้คืนข้อมูลได้เมื่อติดตั้งแอปใหม่</li>
+        </ul>
+      </section>
+
+      <section id="th-7">
+        <h2>7. ระบบบัญชีผู้ใช้</h2>
+        <p>MoneyMa ใช้ Supabase Auth สำหรับการลงทะเบียน เข้าสู่ระบบ และจัดการ session ข้อมูลที่ใช้ได้แก่ อีเมล และ User ID สำหรับเชื่อมโยงข้อมูลการเงินกับบัญชีของคุณ</p>
+      </section>
+
+      <section id="th-8">
+        <h2>8. ระยะเวลาเก็บรักษาข้อมูล</h2>
+        <ul>
+          <li>ข้อมูลบัญชีเก็บไว้ตราบเท่าที่บัญชียังใช้งานอยู่</li>
+          <li>ข้อมูล Cloud จะถูกลบเมื่อคุณลบบัญชีหรือร้องขอการลบ</li>
+          <li>Crash logs เก็บไว้ชั่วคราวเพื่อการแก้บั๊กเท่านั้น</li>
+        </ul>
+      </section>
+
+      <section id="th-9">
+        <h2>9. ความปลอดภัยของข้อมูล</h2>
+        <ul>
+          <li>ส่งข้อมูลผ่าน HTTPS / TLS เสมอ</li>
+          <li>ระบบยืนยันตัวตนและควบคุมการเข้าถึง</li>
+          <li>Supabase เป็น infrastructure ระดับ enterprise ที่มีมาตรฐานความปลอดภัยสูง</li>
+        </ul>
+        <p>อย่างไรก็ตาม ไม่มีระบบใดที่ปลอดภัย 100% เราไม่สามารถรับประกันความปลอดภัยสมบูรณ์แบบได้</p>
+      </section>
+
+      <section id="th-10">
+        <h2>10. สิทธิ์และทางเลือกของผู้ใช้</h2>
+        <ul>
+          <li>แก้ไขหรือลบข้อมูลธุรกรรมในแอปได้ตลอดเวลา</li>
+          <li>ส่งออก (Export) ข้อมูลเป็น Excel</li>
+          <li>สำรองและกู้คืนข้อมูล</li>
+          <li>ออกจากระบบ (Sign out)</li>
+          <li>ขอลบบัญชีและข้อมูลทั้งหมด</li>
         </ul>
         <div class="callout">
-          Privacy and deletion request contact: <code>rnaibro@gmail.com</code>
+          ส่งคำขอลบข้อมูลหรือแจ้งปัญหาได้ที่: <code>naiguitarfolk@gmail.com</code>
         </div>
       </section>
 
-      <section id="section-11">
-        <h2>11. Children's Privacy</h2>
-        <p>MoneyMa is not directed to children under 13, and we do not knowingly collect personal information from children under 13.</p>
+      <section id="th-11">
+        <h2>11. นโยบายสำหรับเด็ก</h2>
+        <p>MoneyMa ไม่ได้ออกแบบมาสำหรับเด็กอายุต่ำกว่า 13 ปี และเราไม่เก็บข้อมูลส่วนตัวของเด็กโดยเจตนา</p>
       </section>
 
-      <section id="section-12">
-        <h2>12. International Data Transfers</h2>
-        <p>If Supabase or any other cloud, hosting, authentication, or crash reporting services used by MoneyMa operate in different countries, your information may be processed or stored outside your country of residence.</p>
+      <section id="th-12">
+        <h2>12. การโอนข้อมูลระหว่างประเทศ</h2>
+        <p>Supabase และบริการคลาวด์อื่นๆ ที่ใช้อาจประมวลผลหรือเก็บข้อมูลในหลายประเทศ การใช้งานแอปถือว่าคุณยินยอมให้โอนข้อมูลตามเงื่อนไขนี้</p>
       </section>
 
-      <section id="section-13">
-        <h2>13. Changes to This Privacy Policy</h2>
-        <p>We may update this Privacy Policy from time to time. When we do, we will revise the "Last updated" date above and may provide additional notice where appropriate.</p>
+      <section id="th-13">
+        <h2>13. การแก้ไขนโยบาย</h2>
+        <p>เราอาจอัปเดตนโยบายนี้เป็นครั้งคราว โดยจะระบุวันที่ "อัปเดตล่าสุด" ด้านบน หากมีการเปลี่ยนแปลงสำคัญจะแจ้งให้ทราบผ่านแอปหรืออีเมล</p>
       </section>
 
-      <section id="section-14">
-        <h2>14. Contact</h2>
-        <p>If you have questions, privacy concerns, or deletion requests, contact:</p>
+      <section id="th-14">
+        <h2>14. ติดต่อเรา</h2>
+        <p>หากมีคำถามหรือต้องการขอลบข้อมูล ติดต่อได้ที่:</p>
         <ul>
-          <li><code>rnaibro@gmail.com</code></li>
+          <li>อีเมล: <code>naiguitarfolk@gmail.com</code></li>
+          <li>LINE: <code>jawnai99</code></li>
         </ul>
       </section>
     </div>
+  </div>
 
-    <footer>
-      MoneyMa Privacy Policy page prepared for public hosting.
-    </footer>
-  </main>
+  <!-- ─── ENGLISH ────────────────────────────────────────────────── -->
+  <div id="lang-en" class="lang-content">
+
+    <nav class="toc">
+      <h2>Contents</h2>
+      <ol>
+        <li><a href="#en-1">Information We Collect</a></li>
+        <li><a href="#en-2">How We Use Information</a></li>
+        <li><a href="#en-3">How Information Is Stored</a></li>
+        <li><a href="#en-4">Third-Party Sharing</a></li>
+        <li><a href="#en-5">AI Bill & Slip Scanning</a></li>
+        <li><a href="#en-6">Cloud Backup & Sync</a></li>
+        <li><a href="#en-7">Account System</a></li>
+        <li><a href="#en-8">Data Retention</a></li>
+        <li><a href="#en-9">Data Security</a></li>
+        <li><a href="#en-10">User Rights & Controls</a></li>
+        <li><a href="#en-11">Children's Privacy</a></li>
+        <li><a href="#en-12">International Transfers</a></li>
+        <li><a href="#en-13">Policy Updates</a></li>
+        <li><a href="#en-14">Contact</a></li>
+      </ol>
+    </nav>
+
+    <div class="content">
+      <section id="en-1">
+        <h2>1. Information We Collect</h2>
+        <h3>Account Information</h3>
+        <ul><li>Email address</li><li>User ID</li><li>Authentication credentials</li></ul>
+        <h3>Financial Information</h3>
+        <ul><li>Income and expense records entered by the user</li><li>Amounts, categories, budgets, dates, and optional notes</li></ul>
+        <h3>App Preferences</h3>
+        <ul><li>Language, theme, and other in-app settings</li></ul>
+        <h3>Crash & Diagnostics</h3>
+        <ul><li>Error reports, app version, device type (for debugging only)</li></ul>
+      </section>
+
+      <section id="en-2">
+        <h2>2. How We Use Information</h2>
+        <ul>
+          <li>Create and manage user accounts</li>
+          <li>Store and display financial records</li>
+          <li>Generate reports and analytics</li>
+          <li>Support cloud backup and device synchronization</li>
+          <li>Detect and fix crashes and technical issues</li>
+          <li>Improve the app over time</li>
+        </ul>
+      </section>
+
+      <section id="en-3">
+        <h2>3. How Information Is Stored</h2>
+        <ul>
+          <li><strong>On-device</strong> — in local app storage</li>
+          <li><strong>Cloud</strong> — on Supabase when sync or account features are enabled</li>
+        </ul>
+      </section>
+
+      <section id="en-4">
+        <h2>4. Third-Party Sharing</h2>
+        <p><strong>We do not sell your data.</strong> We share only with:</p>
+        <ul>
+          <li><strong>Supabase</strong> — database and authentication</li>
+          <li><strong>Google Gemini AI</strong> — temporary image processing for AI scan (images not retained)</li>
+          <li><strong>Firebase (Google)</strong> — crash reporting and analytics (no financial data)</li>
+          <li>Law enforcement when legally required</li>
+        </ul>
+      </section>
+
+      <section id="en-5">
+        <h2>5. AI Bill &amp; Slip Scanning</h2>
+        <ul>
+          <li>Images are sent to Google Gemini AI for <strong>temporary processing only</strong></li>
+          <li>We do not store your images on our servers</li>
+          <li>Extracted data is shown in-app for your review before saving</li>
+          <li>Camera is used solely for this feature — no background recording</li>
+        </ul>
+      </section>
+
+      <section id="en-6">
+        <h2>6. Cloud Backup &amp; Sync</h2>
+        <ul>
+          <li>Financial data is stored on Supabase when signed in with sync enabled</li>
+          <li>Data can be synced across devices sharing the same account</li>
+          <li>Data can be restored after reinstalling the app</li>
+        </ul>
+      </section>
+
+      <section id="en-7">
+        <h2>7. Account System</h2>
+        <p>MoneyMa uses Supabase Auth for sign-up, sign-in, and session management using your email and User ID.</p>
+      </section>
+
+      <section id="en-8">
+        <h2>8. Data Retention</h2>
+        <ul>
+          <li>Account data retained while your account is active</li>
+          <li>Cloud data deleted upon account deletion or written request</li>
+          <li>Crash logs retained temporarily for debugging</li>
+        </ul>
+      </section>
+
+      <section id="en-9">
+        <h2>9. Data Security</h2>
+        <ul>
+          <li>HTTPS / TLS for all data in transit</li>
+          <li>Access controls and authentication safeguards</li>
+          <li>Supabase enterprise-grade infrastructure</li>
+        </ul>
+        <p>No system is 100% secure. We cannot guarantee absolute security.</p>
+      </section>
+
+      <section id="en-10">
+        <h2>10. User Rights &amp; Controls</h2>
+        <ul>
+          <li>Edit or delete any transaction at any time</li>
+          <li>Export data as Excel</li>
+          <li>Backup and restore data</li>
+          <li>Sign out of your account</li>
+          <li>Request deletion of your account and all associated data</li>
+        </ul>
+        <div class="callout">Deletion requests: <code>naiguitarfolk@gmail.com</code></div>
+      </section>
+
+      <section id="en-11">
+        <h2>11. Children's Privacy</h2>
+        <p>MoneyMa is not directed to children under 13. We do not knowingly collect data from children under 13.</p>
+      </section>
+
+      <section id="en-12">
+        <h2>12. International Transfers</h2>
+        <p>Supabase and other cloud services may process data in multiple countries. By using the app you consent to such transfers.</p>
+      </section>
+
+      <section id="en-13">
+        <h2>13. Policy Updates</h2>
+        <p>We may update this policy and will revise the "Last updated" date above. Significant changes will be notified via the app or email.</p>
+      </section>
+
+      <section id="en-14">
+        <h2>14. Contact</h2>
+        <ul>
+          <li>Email: <code>naiguitarfolk@gmail.com</code></li>
+          <li>LINE: <code>jawnai99</code></li>
+        </ul>
+      </section>
+    </div>
+  </div>
+
+  <footer>© 2026 MoneyMa · com.moneyma.app · All rights reserved</footer>
+</main>
+
+<script>
+  function setLang(lang) {
+    document.querySelectorAll('.lang-content').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.lang-btn').forEach(el => el.classList.remove('active'));
+    document.getElementById('lang-' + lang).classList.add('active');
+    event.target.classList.add('active');
+  }
+</script>
 </body>
 </html>

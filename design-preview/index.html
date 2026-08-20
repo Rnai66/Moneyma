@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MoneyMa — Design preview</title>
+<link rel="stylesheet" href="app.css">
+<style>
+  .pv-bar{position:sticky;top:0;z-index:100;display:flex;gap:12px;align-items:center;
+    padding:10px 16px;background:#111;color:#fff;font:600 13px/1 Manrope,sans-serif}
+  .pv-bar button{padding:6px 12px;border-radius:8px;border:1px solid #444;background:#222;color:#fff;cursor:pointer;font:inherit}
+  .pv-bar button[aria-pressed="true"]{background:#5f74ff;border-color:#5f74ff}
+  .pv-frame{border:0;width:100%;display:block;height:900px}
+  .pv-note{padding:8px 16px;background:#1b1b1b;color:#aaa;font:500 12px/1.5 Manrope,sans-serif}
+</style>
+</head>
+<body style="margin:0;background:#0b0b0b">
+
+<div class="pv-bar">
+  <strong>MoneyMa preview</strong>
+  <span style="opacity:.5">ธีม</span>
+  <button id="b-light" aria-pressed="true">Light</button>
+  <button id="b-dark" aria-pressed="false">Dark</button>
+  <span style="opacity:.5;margin-left:12px">ความกว้าง</span>
+  <button data-w="1440" aria-pressed="true">1440</button>
+  <button data-w="1280" aria-pressed="false">1280</button>
+  <button data-w="1024" aria-pressed="false">1024</button>
+  <button data-w="820" aria-pressed="false">820</button>
+  <button data-w="390" aria-pressed="false">390</button>
+</div>
+<div class="pv-note">หน้านี้ใช้ CSS จริงจาก build ล่าสุด · ใช้ตรวจสมดุลเลย์เอาต์เท่านั้น ไม่ใช่แอปจริง</div>
+
+<iframe id="frame" class="pv-frame" style="width:1440px"></iframe>
+
+<script>
+const PAGES = {
+  dashboard: `
+  <div class="dashboard-page">
+    <header class="page-heading">
+      <div><span class="eyebrow">ภาพรวมการเงิน</span><h1>แดชบอร์ด</h1><p>ภาพรวมรายรับ รายจ่าย และยอดคงเหลือประจำเดือน</p></div>
+      <div class="page-heading-actions"><span class="page-chip">กรกฎาคม 2026</span></div>
+    </header>
+    <section class="balance-hero">
+      <div class="balance-hero-copy">
+        <span class="balance-label">ยอดคงเหลือสุทธิ</span>
+        <div class="balance-amount"><span class="balance-currency">฿</span><strong>128,450</strong></div>
+        <div class="balance-trend">↗ 24.8% · เดือนนี้</div>
+      </div><div class="balance-hero-orb"></div>
+    </section>
+    <section class="dashboard dashboard-grid">
+      <article class="card stat-card income"><div class="stat-card-head"><span class="card-title">รายรับรวม</span><span class="stat-icon income">↑</span></div><div class="card-value num" style="color:var(--color-success)">฿518,000</div><div class="stat-note">เดือนนี้</div></article>
+      <article class="card stat-card expense"><div class="stat-card-head"><span class="card-title">รายจ่ายรวม</span><span class="stat-icon expense">↓</span></div><div class="card-value num" style="color:var(--color-danger)">฿389,550</div><div class="stat-note">เดือนนี้</div></article>
+      <article class="card stat-card balance"><div class="stat-card-head"><span class="card-title">คงเหลือสุทธิ</span><span class="stat-icon balance">⬡</span></div><div class="card-value num" style="color:var(--accent-primary)">฿128,450</div><div class="stat-note">+24.8%</div></article>
+    </section>
+    <section class="dashboard-split">
+      <div class="panel performance-card">
+        <div class="panel-header"><div><h2>สถิติ</h2><p class="panel-subtitle">แนวโน้มรายเดือน</p></div><span class="mini-badge">เดือนนี้</span></div>
+        <div class="activity-chart">${[38,56,34,82,48,100,67,44].map((h,i)=>`<div class="activity-bar ${i===5?'active':''}" style="height:${h}%"></div>`).join('')}</div>
+      </div>
+      <div class="panel">
+        <div class="panel-header"><div><h2>รายการล่าสุด</h2><p class="panel-subtitle">5 รายการ</p></div></div>
+        <div class="stack-sm">
+          ${[['อาหาร','2026-07-30 · ข้าวมันไก่','expense','฿120'],['เงินเดือน','2026-07-28 · บริษัท','income','฿45,000'],['เดินทาง','2026-07-27 · BTS','expense','฿62'],['ค่าเช่า','2026-07-25 · คอนโด','expense','฿12,000'],['ฟรีแลนซ์','2026-07-22 · งานออกแบบ','income','฿8,500']]
+            .map(([c,d,t,a])=>`<div class="transaction-item"><div class="transaction-info"><div class="transaction-avatar" style="background:var(--color-${t==='income'?'success':'danger'}-soft);color:var(--color-${t==='income'?'success':'danger'})">${c[0]}</div><div class="transaction-details"><span class="transaction-category">${c}</span><span class="transaction-date">${d}</span></div></div><span class="transaction-amount ${t} num">${t==='income'?'+':'−'} ${a}</span></div>`).join('')}
+        </div>
+      </div>
+    </section>
+  </div>`,
+
+  transactions: `
+  <div class="transactions-container page--wide">
+    <header class="page-heading">
+      <div><span class="eyebrow">รายการธุรกรรม</span><h1>รายการธุรกรรม</h1><p>ทั้งหมด 248 รายการ</p></div>
+    </header>
+    <section class="toolbar">
+      <button class="btn btn-primary-lg"><span class="btn-plus">+</span>เพิ่มรายการใหม่</button>
+      <span class="toolbar-divider"></span>
+      <div class="scan-actions">
+        <button class="action-tile action-tile--slip"><span class="action-tile-icon">📷</span><span class="action-tile-copy"><strong>สแกนสลิป</strong><small>อ่านสลิปโอนเงินอัตโนมัติ</small></span></button>
+        <button class="action-tile action-tile--bill"><span class="action-tile-icon">🧾</span><span class="action-tile-copy"><strong>สแกนบิล</strong><small>แยกรายการจากใบเสร็จ</small></span></button>
+      </div>
+      <div class="toolbar-end">
+        <div class="view-switch">
+          <button><span class="view-switch-icon">▤</span><span class="view-switch-label">การ์ด</span></button>
+          <button class="is-active"><span class="view-switch-icon">⊞</span><span class="view-switch-label">ตาราง</span></button>
+        </div>
+      </div>
+    </section>
+    <section class="quota-banner">
+      <div class="quota-banner-copy"><span class="quota-banner-icon">📊</span>
+        <div><strong>โควตาบันทึกธุรกรรมแผนใช้งานฟรี</strong><p>บันทึกไปแล้ว <b class="num">41 / 50</b> รายการในเดือนนี้</p>
+        <div class="progress" style="margin-top:var(--space-2)"><div class="progress-fill is-warning" style="width:82%"></div></div></div>
+      </div><button class="btn btn-sm">🚀 อัปเกรดเป็น Pro</button>
+    </section>
+    <section class="metrics-strip">
+      <div class="metric-tile income"><span>รายรับรวม</span><strong class="num">฿518,000</strong></div>
+      <div class="metric-tile expense"><span>รายจ่ายรวม</span><strong class="num">฿389,550</strong></div>
+      <div class="metric-tile"><span>คงเหลือสุทธิ</span><strong class="num" style="color:var(--accent-primary)">฿128,450</strong></div>
+      <div class="metric-tile"><span>โหมดจัดเก็บ</span><strong style="font-size:var(--text-md)">เบราว์เซอร์</strong></div>
+    </section>
+    <section class="panel glass-card">
+      <div class="panel-header" style="margin-bottom:var(--space-4)"><span class="section-title-bar">ตัวกรอง</span><button class="btn btn-sm btn-ghost">ล้างค่า</button></div>
+      <div class="filter-bar">
+        <div class="field"><label>ค้นหา</label><input type="search" placeholder="หมวดหมู่ หรือ รายละเอียด"></div>
+        <div class="field"><label>ประเภท</label><select><option>ทุกประเภท</option></select></div>
+        <div class="field"><label>หมวดหมู่</label><select><option>ทุกหมวดหมู่</option></select></div>
+        <div class="field"><label>ตั้งแต่</label><input type="date"></div>
+        <div class="field"><label>ถึง</label><input type="date"></div>
+      </div>
+      <p class="result-count">แสดง 6 จาก 248 รายการ</p>
+    </section>
+    <section class="panel card--flush">
+      <div class="table-wrap"><table class="data-table">
+        <thead><tr><th style="width:132px">วันที่</th><th style="width:128px">ประเภท</th><th style="width:20%">หมวดหมู่</th><th>รายละเอียด</th><th class="is-num" style="width:150px">จำนวนเงิน</th><th class="is-center" style="width:104px"></th></tr></thead>
+        <tbody>
+          ${[['2026-07-30','expense','อาหาร','ข้าวมันไก่ประตูน้ำ','฿120.00'],['2026-07-28','income','เงินเดือน','บริษัท เอบีซี จำกัด','฿45,000.00'],['2026-07-27','expense','เดินทาง','BTS อโศก–สยาม ไป-กลับ','฿62.00'],['2026-07-25','expense','ค่าเช่า','คอนโดรัชดา ห้อง 1204 เดือนกรกฎาคม','฿12,000.00'],['2026-07-22','income','ฟรีแลนซ์','งานออกแบบโลโก้','฿8,500.00'],['2026-07-20','expense','ช้อปปิ้ง','เสื้อผ้า','฿1,890.00']]
+          .map(([d,t,c,desc,a])=>`<tr><td><span class="inline-cell">${d}</span></td><td><span class="type-badge ${t}">${t==='income'?'↑ รายรับ':'↓ รายจ่าย'}</span></td><td><span class="inline-cell">${c}</span></td><td class="is-truncate"><span class="inline-cell">${desc}</span></td><td class="is-num num" style="font-weight:700;color:var(--color-${t==='income'?'success':'danger'})">${t==='income'?'+':'−'} ${a}</td><td class="is-center"><div class="cluster" style="gap:var(--space-1);justify-content:center;flex-wrap:nowrap"><button class="icon-btn">✏️</button><button class="icon-btn danger">🗑️</button></div></td></tr>`).join('')}
+        </tbody>
+        <tfoot><tr><td colspan="4">แสดง 6 จาก 248 รายการ</td><td class="is-num num" style="color:var(--color-success)">฿39,428.00</td><td></td></tr></tfoot>
+      </table></div>
+    </section>
+  </div>`,
+
+  settings: `
+  <div class="page page--narrow">
+    <header class="page-heading"><div><span class="eyebrow">การตั้งค่าและข้อมูล</span><h1>ตั้งค่า</h1><p>จัดการค่ากำหนดและข้อมูลของคุณ</p></div></header>
+    <section class="panel">
+      <div class="panel-header" style="margin-bottom:var(--space-4)"><span class="section-title-bar">โปรไฟล์ผู้ใช้ / User profile</span></div>
+      <div class="stack">
+        <div class="setting-row"><div class="setting-row-copy"><strong>ผู้ใช้งาน (User)</strong><p>📧 naiguitarfolk@gmail.com</p></div><span class="tag tag-neutral">FREE</span></div>
+        <div class="quota-card">
+          <div class="section-title-bar" style="margin-bottom:var(--space-3)">🤖 โควต้า AI สแกน / AI scan quota</div>
+          <div class="quota-grid">
+            <div class="quota-item"><span>รายวัน (Daily)</span><strong class="num">0 / 20</strong></div>
+            <div class="quota-item"><span>รายเดือน (Monthly)</span><strong class="num">0 / 300</strong></div>
+            <div class="quota-item"><span>คงเหลือ (Remaining)</span><strong class="num" style="color:var(--accent-primary)">300</strong></div>
+          </div>
+        </div>
+      </div>
+    </section>
+    <section class="panel">
+      <div class="panel-header" style="margin-bottom:var(--space-4)"><span class="section-title-bar">รูปลักษณ์</span></div>
+      <div class="stack-sm">
+        <div class="setting-row"><div class="setting-row-copy"><strong>โหมดกลางคืน</strong><p>สลับเป็นธีมมืด</p></div><div class="setting-row-control"><span class="switch"><span class="switch-track"><span class="switch-knob"></span></span><span class="switch-label">OFF</span></span></div></div>
+        <div class="setting-row"><div class="setting-row-copy"><strong>ภาษา</strong><p>ภาษาไทย</p></div><div class="setting-row-control"><select style="min-width:170px"><option>🇹🇭 ภาษาไทย</option></select></div></div>
+      </div>
+    </section>
+    <section class="panel">
+      <div class="panel-header" style="margin-bottom:var(--space-4)"><span class="section-title-bar">ส่งออกและสำรองข้อมูล</span></div>
+      <div class="stack-sm">
+        <div class="setting-row"><div class="setting-row-copy"><strong>ส่งออกเป็น Excel</strong><p>บันทึกรายการทั้งหมดเป็นไฟล์ .xlsx</p></div><div class="setting-row-control"><button class="btn btn-ghost">ส่งออก</button></div></div>
+        <div class="setting-row"><div class="setting-row-copy"><strong>สำรองข้อมูล</strong><p>สร้างไฟล์สำรองแบบ JSON</p></div><div class="setting-row-control"><button class="btn btn-ghost">สำรอง</button></div></div>
+        <div class="setting-row"><div class="setting-row-copy"><strong>กู้คืนข้อมูล</strong><p>เขียนทับข้อมูลปัจจุบันด้วยไฟล์สำรอง</p></div><div class="setting-row-control"><button class="btn btn-danger">กู้คืน</button></div></div>
+      </div>
+    </section>
+  </div>`,
+
+  budget: `
+  <div class="page">
+    <header class="page-heading">
+      <div><span class="eyebrow">ควบคุมงบประมาณ</span><h1>งบประมาณ</h1><p>ตั้งวงเงินรายหมวดหมู่พร้อมแจ้งเตือน</p></div>
+      <div class="page-heading-actions"><div class="field"><label>เลือกเดือน</label><input type="month" value="2026-07"></div><button class="btn">+ ตั้งงบประมาณ</button></div>
+    </header>
+    <section class="metrics-strip">
+      <div class="metric-tile"><span>งบที่ตั้งไว้</span><strong class="num">3</strong></div>
+      <div class="metric-tile expense"><span>ใช้ไปแล้ว</span><strong class="num">฿24,180</strong></div>
+      <div class="metric-tile"><span>วงเงินรวม</span><strong class="num">฿32,000</strong></div>
+      <div class="metric-tile"><span>คงเหลือ</span><strong class="num" style="color:var(--color-success)">฿7,820</strong></div>
+    </section>
+    <section class="panel">
+      <div class="panel-header"><span class="section-title-bar">สถานะงบประมาณ</span><span class="mini-badge">2026-07</span></div>
+      <div class="grid grid-auto-lg">
+        ${[['อาหาร',8400,10000,84,'is-warning','tag-warning','ใกล้เกิน','var(--color-warning)'],['ค่าเช่า',12000,12000,100,'is-danger','tag-danger','เกินงบ','var(--color-danger)'],['เดินทาง',3780,10000,38,'','tag-success','อยู่ในเกณฑ์','var(--color-success)']]
+        .map(([c,u,l,p,tone,tag,label,col])=>`<article class="budget-card" style="border-left-color:${col}">
+          <div class="cluster-between" style="align-items:flex-start"><div><strong class="budget-card-title">${c}</strong><span class="tag ${tag}">${label}</span></div><button class="icon-btn danger">🗑️</button></div>
+          <div><div class="cluster-between" style="margin-bottom:var(--space-2)"><span class="num" style="font-weight:650;color:var(--color-text-primary)">฿${u.toLocaleString()} <span style="font-weight:400;color:var(--color-text-muted)">/ ฿${l.toLocaleString()}</span></span><span class="num" style="font-weight:800;color:${col}">${p}%</span></div>
+          <div class="progress"><div class="progress-fill ${tone}" style="width:${p}%"></div></div></div>
+          <div class="grid grid-2" style="gap:var(--space-3)"><div class="budget-stat"><span>คงเหลือ</span><strong class="num" style="color:var(--color-${l-u<0?'danger':'success'})">฿${(l-u).toLocaleString()}</strong></div><div class="budget-stat"><span>เตือนที่</span><strong class="num" style="color:var(--accent-primary)">฿${(l*0.8).toLocaleString()}</strong></div></div>
+        </article>`).join('')}
+      </div>
+    </section>
+    <section class="panel tips-panel">
+      <div class="section-title-bar" style="color:var(--accent-primary);margin-bottom:var(--space-3)">💡 เคล็ดลับงบประมาณ</div>
+      <ul class="tips-list"><li>ตั้งงบจากค่าเฉลี่ย 3 เดือนย้อนหลัง</li><li>เผื่อเงินสำรองฉุกเฉิน 10–15%</li><li>ทบทวนงบทุกสิ้นเดือน</li></ul>
+    </section>
+  </div>`
+};
+
+const frame = document.getElementById('frame');
+let dark = false;
+
+function render(){
+  const doc = frame.contentDocument;
+  doc.open();
+  doc.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><link rel="stylesheet" href="app.css"></head>
+  <body style="margin:0"><div class="app ${dark?'dark-mode':''}" style="height:auto;min-height:100vh;overflow:visible">
+    <div class="app-backdrop"></div>
+    <nav class="sidebar">
+      <div class="logo"><div class="logo-mark">M</div><div><h1>MoneyMa</h1><div class="logo-subtitle">Personal finance manager</div></div></div>
+      <div class="sidebar-spotlight"><span class="sidebar-kicker">ภาพรวมเดือนนี้</span><strong>กรกฎาคม 2026</strong><p>ติดตามรายรับ รายจ่าย และสภาพคล่องในมุมมองเดียว</p></div>
+      <ul class="nav-menu">
+        ${[['◫','แดชบอร์ด','ภาพรวมการเงิน',1],['▤','ธุรกรรม','248 รายการ',0],['◭','สถิติ','กราฟและสถิติ',0],['▣','รายงาน','สรุปและส่งออก',0],['◎','งบประมาณ','ตั้งวงเงิน',0],['💎','Premium','ปลดล็อกฟีเจอร์',0],['◌','ตั้งค่า','ค่ากำหนด',0]]
+        .map(([i,l,h,a])=>`<li><button class="${a?'active':''}"><span class="nav-icon">${i}</span><span class="nav-copy"><strong>${l}</strong><small>${h}</small></span></button></li>`).join('')}
+      </ul>
+      <div class="nav-footer"><div class="nav-footer-card"><div><div class="nav-footer-title">${dark?'โหมดกลางคืน':'โหมดสว่าง'}</div><div class="nav-footer-subtitle">สลับบรรยากาศของหน้าแอป</div></div><button class="theme-toggle"><span class="theme-toggle-knob ${dark?'active':''}"></span></button></div></div>
+    </nav>
+    <main class="main-content" style="overflow:visible">
+      ${Object.values(PAGES).join('<div style="height:56px"></div>')}
+    </main>
+  </div></body></html>`);
+  doc.close();
+  setTimeout(()=>{ frame.style.height = Math.max(900, doc.body.scrollHeight + 40) + 'px'; }, 350);
+}
+
+document.getElementById('b-light').onclick = ()=>{dark=false;setPressed('theme');render();};
+document.getElementById('b-dark').onclick = ()=>{dark=true;setPressed('theme');render();};
+document.querySelectorAll('[data-w]').forEach(b=>b.onclick=()=>{
+  frame.style.width = b.dataset.w+'px';
+  document.querySelectorAll('[data-w]').forEach(x=>x.setAttribute('aria-pressed', x===b));
+});
+function setPressed(){
+  document.getElementById('b-light').setAttribute('aria-pressed', !dark);
+  document.getElementById('b-dark').setAttribute('aria-pressed', dark);
+}
+render();
+</script>
+</body>
+</html>

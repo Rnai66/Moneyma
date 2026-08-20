@@ -61,7 +61,8 @@ class SyncService {
         progress: 0,
       });
 
-      // Add user_id to transactions for cloud and omit local-only fields
+      // Add user_id to transactions for cloud and omit local-only fields.
+      // updated_at is carried through so the merge below can do last-write-wins.
       const transactionsToSync = localTransactions.map((tx) => ({
         id: tx.id,
         user_id: userId,
@@ -70,6 +71,7 @@ class SyncService {
         category: tx.category,
         description: tx.description || '',
         date: tx.date,
+        updated_at: SyncService.timestampOf(tx) || new Date().toISOString(),
       }));
 
       // Upload to Supabase
@@ -224,33 +226,73 @@ class SyncService {
   }
 
   /**
-   * Merge local and cloud transactions
-   * Deduplicates by ID, uses latest updated_at
+   * Resolve a comparable timestamp for a transaction.
+   * Falls back through the field names used across local storage and Supabase,
+   * then to the transaction date, then to 0 — never NaN, so comparisons are
+   * always meaningful (the old code compared NaN and cloud silently always won).
+   * @returns {string|null} ISO string, or null when nothing usable exists
    */
-  mergeTransactions(local, cloud) {
-    const merged = {};
+  static timestampOf(tx) {
+    const candidates = [
+      tx?.updated_at,
+      tx?.updatedAt,
+      tx?.created_at,
+      tx?.createdAt,
+    ];
 
-    // Add cloud transactions
+    for (const raw of candidates) {
+      if (!raw) continue;
+      const ms = new Date(raw).getTime();
+      if (Number.isFinite(ms)) return new Date(ms).toISOString();
+    }
+
+    return null;
+  }
+
+  static timeValueOf(tx) {
+    const iso = SyncService.timestampOf(tx);
+    if (iso) return new Date(iso).getTime();
+
+    // last resort: the transaction's own date (day precision)
+    const dayMs = tx?.date ? new Date(tx.date).getTime() : NaN;
+    return Number.isFinite(dayMs) ? dayMs : 0;
+  }
+
+  /**
+   * Merge local and cloud transactions.
+   * Deduplicates by id; the most recently updated copy wins.
+   */
+  mergeTransactions(local = [], cloud = []) {
+    const merged = new Map();
+
     cloud.forEach((tx) => {
-      merged[tx.id] = tx;
+      if (tx?.id) merged.set(tx.id, { ...tx, synced: true });
     });
 
-    // Add/override with local transactions (local takes precedence for new items)
     local.forEach((tx) => {
-      if (!merged[tx.id]) {
-        merged[tx.id] = { ...tx, synced: true };
-      } else {
-        // Keep newer version
-        const cloudTime = new Date(merged[tx.id].updated_at || merged[tx.id].createdAt);
-        const localTime = new Date(tx.updated_at || tx.createdAt);
-        if (localTime > cloudTime) {
-          merged[tx.id] = { ...tx, synced: true };
-        }
+      if (!tx?.id) return;
+
+      const existing = merged.get(tx.id);
+      if (!existing) {
+        merged.set(tx.id, { ...tx, synced: true });
+        return;
+      }
+
+      const localTime = SyncService.timeValueOf(tx);
+      const cloudTime = SyncService.timeValueOf(existing);
+
+      // strictly newer local edit replaces the cloud copy
+      if (localTime > cloudTime) {
+        merged.set(tx.id, {
+          ...existing,
+          ...tx,
+          synced: true,
+          updated_at: SyncService.timestampOf(tx) || existing.updated_at,
+        });
       }
     });
 
-    // Convert to array and sort by date
-    return Object.values(merged).sort(
+    return Array.from(merged.values()).sort(
       (a, b) => new Date(b.date) - new Date(a.date)
     );
   }

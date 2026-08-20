@@ -1,9 +1,10 @@
 import React from 'react';
+import PromoBanner from '../components/PromoBanner';
 
-const CARD_COLORS = {
-  income: { border: '#10b981', bg: 'rgba(16,185,129,0.08)', icon: '↑' },
-  expense: { border: '#ef4444', bg: 'rgba(239,68,68,0.08)', icon: '↓' },
-  balance: { border: '#6366f1', bg: 'rgba(99,102,241,0.08)', icon: '⬡' },
+const CARD_ICONS = {
+  income: <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>,
+  expense: <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>,
+  balance: <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>,
 };
 
 function Dashboard({ summary, transactions, t }) {
@@ -19,65 +20,72 @@ function Dashboard({ summary, transactions, t }) {
   const cards = [
     { type: 'income', label: t.totalIncome, value: totalIncome, note: t.period },
     { type: 'expense', label: t.totalExpense, value: totalExpense, note: t.period },
-    { type: 'balance', label: t.netBalance, value: balance, note: trend >= 0 ? `+${trend.toFixed(1)}%` : `${trend.toFixed(1)}%` },
+    {
+      type: 'balance',
+      label: t.netBalance,
+      value: balance,
+      note: trend >= 0 ? `+${trend.toFixed(1)}%` : `${trend.toFixed(1)}%`,
+    },
   ];
+
+  const valueColor = (type, value) => {
+    if (type === 'income') return 'var(--color-success)';
+    if (type === 'expense') return 'var(--color-danger)';
+    return value >= 0 ? 'var(--accent-primary)' : 'var(--color-danger)';
+  };
 
   return (
     <div className="dashboard-page">
-      <div className="page-heading">
+      {/* แสดงเฉพาะช่วงโปร + ผู้ใช้ free + แพลตฟอร์มที่ซื้อได้ — ตัวคอมโพเนนต์ตัดสินเอง */}
+      <PromoBanner />
+
+      <header className="page-heading">
         <div>
           <span className="eyebrow">{t.dashboardSubtitle}</span>
           <h1>{t.dashboardTitle}</h1>
           <p>{t.dashboardSubtitle}</p>
         </div>
-        <div className="page-chip">{t.period}</div>
-      </div>
+        <div className="page-heading-actions">
+          <span className="page-chip">{t.period}</span>
+        </div>
+      </header>
 
       <section className="balance-hero">
         <div className="balance-hero-copy">
           <span className="balance-label">{t.netBalance}</span>
           <div className="balance-amount">
             <span className="balance-currency">฿</span>
-            <strong>{new Intl.NumberFormat('th-TH', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(balance)}</strong>
+            <strong>
+              {new Intl.NumberFormat('th-TH', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(balance)}
+            </strong>
           </div>
-          <div className="balance-trend">{trend >= 0 ? '↗' : '↘'} {Math.abs(trend).toFixed(1)}% {t.period}</div>
+          <div className="balance-trend">
+            {trend >= 0 ? '↗' : '↘'} {Math.abs(trend).toFixed(1)}% · {t.period}
+          </div>
         </div>
         <div className="balance-hero-orb" />
       </section>
 
-      <div className="dashboard dashboard-grid">
-        {cards.map(({ type, label, value, note }) => {
-          const c = CARD_COLORS[type];
-          return (
-            <div key={type} className={`card stat-card ${type}`} style={{ gap: '16px', cursor: 'default' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <span className="card-title">{label}</span>
-                <div style={{
-                  width: '34px', height: '34px', borderRadius: '10px',
-                  background: c.bg, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: '16px', fontWeight: '800', color: c.border, flexShrink: 0,
-                }}>
-                  {c.icon}
-                </div>
-              </div>
-              <div className="card-value" style={{
-                color: type === 'income' ? 'var(--color-success)' :
-                  type === 'expense' ? 'var(--color-danger)' :
-                    (value >= 0 ? 'var(--accent-primary)' : 'var(--color-danger)'),
-              }}>
-                {formatCurrency(value)}
-              </div>
-              <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>{note}</div>
+      <section className="dashboard dashboard-grid">
+        {cards.map(({ type, label, value, note }) => (
+          <article key={type} className={`card stat-card ${type}`}>
+            <div className="stat-card-head">
+              <span className="card-title">{label}</span>
+              <span className={`stat-icon ${type}`}>{CARD_ICONS[type]}</span>
             </div>
-          );
-        })}
-      </div>
+            <div className="card-value" style={{ color: valueColor(type, value) }}>
+              {formatCurrency(value)}
+            </div>
+            <div className="stat-note">{note}</div>
+          </article>
+        ))}
+      </section>
 
       <section className="dashboard-split">
-        <div className="recent-transactions performance-card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+        <div className="panel performance-card">
+          <div className="panel-header">
             <div>
-              <h2 style={{ margin: 0 }}>{t.statisticsTitle}</h2>
+              <h2>{t.statisticsTitle}</h2>
               <p className="panel-subtitle">{t.monthlyTrend}</p>
             </div>
             <span className="mini-badge">{t.period}</span>
@@ -85,55 +93,60 @@ function Dashboard({ summary, transactions, t }) {
 
           <div className="activity-chart">
             {activityBars.map((height, index) => (
-              <div key={height + index} className={`activity-bar ${index === 5 ? 'active' : ''}`} style={{ height: `${height}%` }} />
+              <div
+                key={`${height}-${index}`}
+                className={`activity-bar ${index === 5 ? 'active' : ''}`}
+                style={{ height: `${height}%` }}
+              />
             ))}
           </div>
         </div>
 
-        <div className="recent-transactions">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-          <div>
-            <h2 style={{ margin: 0 }}>{t.recentTransactions}</h2>
-            <p className="panel-subtitle">{t.lastEntries.replace('{n}', transactions?.length || 0)}</p>
+        <div className="panel">
+          <div className="panel-header">
+            <div>
+              <h2>{t.recentTransactions}</h2>
+              <p className="panel-subtitle">{t.lastEntries.replace('{n}', transactions?.length || 0)}</p>
+            </div>
           </div>
-          <span style={{ fontSize: '12px', color: 'var(--color-text-secondary)', fontWeight: '500' }}>
-            {t.lastEntries.replace('{n}', transactions?.length || 0)}
-          </span>
-        </div>
 
-        {transactions && transactions.length > 0 ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-            {transactions.map((tx) => (
-              <div key={tx.id} className="transaction-item">
-                <div className="transaction-info">
-                  <div className="transaction-avatar" style={{
-                    background: tx.type === 'income'
-                      ? 'linear-gradient(135deg, #10b981, #059669)'
-                      : 'linear-gradient(135deg, #ef4444, #dc2626)',
-                  }}>
-                    {(tx.category || '?').charAt(0)}
+          {transactions && transactions.length > 0 ? (
+            <div className="stack-sm">
+              {transactions.map((tx) => (
+                <div key={tx.id} className="transaction-item">
+                  <div className="transaction-info">
+                    <div
+                      className="transaction-avatar"
+                      style={{
+                        background: tx.type === 'income'
+                          ? 'linear-gradient(135deg, #10b981, #059669)'
+                          : 'linear-gradient(135deg, #ef4444, #dc2626)',
+                      }}
+                    >
+                      {(tx.category || '?').charAt(0)}
+                    </div>
+                    <div className="transaction-details">
+                      <span className="transaction-category">{tx.category}</span>
+                      <span className="transaction-date">
+                        {tx.date}{tx.description ? ` · ${tx.description}` : ''}
+                      </span>
+                    </div>
                   </div>
-                  <div className="transaction-details">
-                    <span className="transaction-category">{tx.category}</span>
-                    <span className="transaction-date">{tx.date}{tx.description ? ` · ${tx.description}` : ''}</span>
-                  </div>
+                  <span className={`transaction-amount ${tx.type}`}>
+                    {tx.type === 'income' ? '+' : '−'}&nbsp;{formatCurrency(tx.amount)}
+                  </span>
                 </div>
-                <span className={`transaction-amount ${tx.type}`}>
-                  {tx.type === 'income' ? '+' : '−'}&nbsp;{formatCurrency(tx.amount)}
-                </span>
+              ))}
+            </div>
+          ) : (
+            <div className="empty-state">
+              <div className="empty-state-icon" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                <svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
               </div>
-            ))}
-          </div>
-        ) : (
-          <div style={{
-            textAlign: 'center', padding: '48px 20px', color: 'var(--color-text-secondary)',
-            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px',
-          }}>
-            <div style={{ fontSize: '40px', opacity: 0.3 }}>📋</div>
-            <p style={{ fontWeight: '500', color: 'var(--color-text-primary)' }}>{t.noTransactionsYet}</p>
-            <p style={{ fontSize: '13px' }}>{t.addFirstTransaction}</p>
-          </div>
-        )}
+              <strong>{t.noTransactionsYet}</strong>
+              <p>{t.addFirstTransaction}</p>
+            </div>
+          )}
         </div>
       </section>
     </div>

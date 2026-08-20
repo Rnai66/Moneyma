@@ -1,46 +1,77 @@
 import { Purchases } from '@revenuecat/purchases-capacitor';
 import { Capacitor } from '@capacitor/core';
 
-// TODO: Replace these keys with your actual RevenueCat public API keys.
-const API_KEY_ANDROID = "goog_xxxxxx"; // Google Play API key from RevenueCat
-const API_KEY_IOS = "appl_xxxxxx"; // App Store API key from RevenueCat
-const ENTITLEMENT_ID = "Premium"; // Your Entitlement ID setup in RevenueCat
+// Read RevenueCat keys from environment variables or use fallback
+const API_KEY_ANDROID = process.env.REACT_APP_REVENUECAT_API_KEY_ANDROID || ""; // goog_… from RevenueCat → Project settings → API keys
+const API_KEY_IOS = process.env.REACT_APP_REVENUECAT_API_KEY_IOS || "";        // appl_…
+const ENTITLEMENT_ID = "Premium"; // Entitlement ID configured in RevenueCat
+
+/**
+ * A RevenueCat SDK key looks like `goog_<22+ random chars>` / `appl_<…>`.
+ * The old check only compared against the literal string 'goog_xxxxxx', so a
+ * placeholder like 'goog_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx' passed straight
+ * through and the SDK was configured with a bogus key — which fails silently
+ * and surfaces later as the useless "No subscription offerings available".
+ */
+function isValidRevenueCatKey(key, expectedPrefix) {
+  if (typeof key !== 'string') return false;
+
+  const value = key.trim();
+  if (!value.startsWith(`${expectedPrefix}_`)) return false;
+
+  const body = value.slice(expectedPrefix.length + 1);
+  if (body.length < 15) return false;
+
+  // reject obvious placeholders: xxxxx…, 00000…, or a single repeated char
+  if (/^x+$/i.test(body)) return false;
+  if (/^(.)\1+$/.test(body)) return false;
+  if (/xxxx/i.test(body)) return false;
+
+  return true;
+}
 
 class PaymentService {
   isInitialized = false;
   isMocked = false;
+  /** why billing is unavailable — surfaced to the UI instead of a cryptic error */
+  unavailableReason = null;
 
   async init(userId = null) {
     if (this.isInitialized) return;
 
+    const platform = Capacitor.getPlatform();
+
     try {
-      if (Capacitor.getPlatform() === 'android') {
-        if (API_KEY_ANDROID === 'goog_xxxxxx') {
-          console.warn('RevenueCat API Key not set for Android. Mocking premium.');
+      if (platform === 'android' || platform === 'ios') {
+        const key = platform === 'android' ? API_KEY_ANDROID : API_KEY_IOS;
+        const prefix = platform === 'android' ? 'goog' : 'appl';
+
+        if (!isValidRevenueCatKey(key, prefix)) {
+          console.warn(
+            `[Billing] RevenueCat ${platform} key missing or placeholder. ` +
+            `Set REACT_APP_REVENUECAT_API_KEY_${platform.toUpperCase()} in .env.local ` +
+            `(RevenueCat → Project settings → API keys), then rebuild. Running in mock mode.`
+          );
           this.isMocked = true;
+          this.unavailableReason = 'not_configured';
           this.isInitialized = true;
           return;
         }
-        await Purchases.configure({ apiKey: API_KEY_ANDROID, appUserID: userId });
-      } else if (Capacitor.getPlatform() === 'ios') {
-        if (API_KEY_IOS === 'appl_xxxxxx') {
-          console.warn('RevenueCat API Key not set for iOS. Mocking premium.');
-          this.isMocked = true;
-          this.isInitialized = true;
-          return;
-        }
-        await Purchases.configure({ apiKey: API_KEY_IOS, appUserID: userId });
+
+        await Purchases.configure({ apiKey: key, appUserID: userId });
       } else {
-        console.warn('RevenueCat is only supported on native mobile platforms (iOS/Android). Mocking premium for web.');
-        // This is useful for testing in the browser
-        this.isMocked = true;
+        // Web is handled via Stripe, so we don't need RevenueCat
         this.isInitialized = true;
         return;
       }
+
       this.isInitialized = true;
       console.log('RevenueCat initialized successfully');
     } catch (error) {
       console.error('Error initializing RevenueCat:', error);
+      this.isMocked = true;
+      this.unavailableReason = 'init_failed';
+      this.isInitialized = true;
     }
   }
 
@@ -48,22 +79,42 @@ class PaymentService {
     try {
       if (!this.isInitialized) return null;
       if (this.isMocked || Capacitor.getPlatform() === 'web') {
-        // Mock data for web development
-        return {
-          availablePackages: [
-            { identifier: 'monthly', product: { title: 'Subscription Monthly', priceString: '$4.99', description: 'Cloud backup and ongoing support billed every month.' } },
-            { identifier: 'yearly', product: { title: 'Subscription Yearly', priceString: '$39.99', description: 'Cloud backup and ongoing support billed yearly. Save 33%.' } }
-          ]
-        };
+        // Web packages are hardcoded in PremiumSettings to use Stripe Price IDs
+        return { availablePackages: [] };
       }
 
       const offerings = await Purchases.getOfferings();
-      // Returns current offering configured in RevenueCat
-      return offerings.current; 
+
+      // `current` is null when no offering is marked "current" in RevenueCat —
+      // fall back to the first configured one so a half-set-up dashboard still works.
+      let offering = offerings?.current;
+      if (!offering?.availablePackages?.length && offerings?.all) {
+        offering = Object.values(offerings.all).find(o => o?.availablePackages?.length) || offering;
+      }
+
+      if (!offering?.availablePackages?.length) {
+        this.unavailableReason = 'no_offerings';
+        console.warn(
+          '[Billing] RevenueCat returned no packages. Usual causes: ' +
+          '(1) products not created in Play Console, ' +
+          '(2) products not attached to an Offering in RevenueCat, ' +
+          '(3) app not published to any track yet, ' +
+          '(4) running on an emulator without Google Play Store, ' +
+          '(5) Play Service Account not linked in RevenueCat.'
+        );
+      }
+
+      return offering || null;
     } catch (error) {
       console.error('Error fetching offerings:', error);
+      this.unavailableReason = 'store_error';
       return null;
     }
+  }
+
+  /** Human-readable reason billing can't run right now (null = fine). */
+  getUnavailableReason() {
+    return this.unavailableReason;
   }
 
   async purchasePackage(packageToBuy) {

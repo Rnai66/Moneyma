@@ -6,55 +6,73 @@ import {
 } from '../utils/dataTransfer';
 import { useAuth } from '../services/AuthContext';
 import { useSync } from '../services/useSync';
+import { checkAiLimit } from '../services/AiUsageService';
+import SupabaseService from '../services/SupabaseService';
+import { useSubscription } from '../SubscriptionContext/SubscriptionContext';
+import { APP_VERSION, APP_ICON } from '../config/appInfo';
+import ExportCustomizerModal from '../components/ExportCustomizerModal';
 
-function ToggleSwitch({ checked, onChange }) {
+function ToggleSwitch({ checked, onChange, label }) {
   return (
-    <div onClick={() => onChange(!checked)} style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '10px' }}>
-      <div style={{
-        width: '44px', height: '24px', borderRadius: '999px', position: 'relative',
-        background: checked ? 'var(--accent-gradient)' : 'var(--color-border)',
-        transition: 'background 0.25s ease',
-        boxShadow: checked ? '0 2px 8px rgba(99,102,241,0.4)' : 'none',
-        flexShrink: 0,
-      }}>
-        <div style={{
-          position: 'absolute', top: '3px', left: checked ? '23px' : '3px',
-          width: '18px', height: '18px', borderRadius: '50%', background: 'white',
-          boxShadow: '0 1px 4px rgba(0,0,0,0.2)', transition: 'left 0.25s ease',
-        }} />
-      </div>
-      <span style={{ fontWeight: '600', fontSize: '13px', color: checked ? 'var(--accent-primary)' : 'var(--color-text-secondary)' }}>
-        {checked ? 'ON' : 'OFF'}
-      </span>
-    </div>
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      className={`switch ${checked ? 'is-on' : ''}`}
+      onClick={() => onChange(!checked)}
+    >
+      <span className="switch-track"><span className="switch-knob" /></span>
+      <span className="switch-label">{checked ? 'ON' : 'OFF'}</span>
+    </button>
   );
 }
 
 function SectionCard({ title, children }) {
   return (
-    <div className="card" style={{ padding: '24px' }}>
-      <span className="section-title-bar" style={{ marginBottom: '20px', display: 'flex' }}>{title}</span>
+    <section className="panel">
+      <div className="panel-header" style={{ marginBottom: 'var(--space-4)' }}>
+        <span className="section-title-bar">{title}</span>
+      </div>
       {children}
+    </section>
+  );
+}
+
+/* one consistent settings row: label + description on the left, control on the right */
+function SettingRow({ title, description, children, extra }) {
+  return (
+    <div className="setting-row">
+      <div className="setting-row-copy">
+        <strong>{title}</strong>
+        {description && <p>{description}</p>}
+        {extra}
+      </div>
+      {children && <div className="setting-row-control">{children}</div>}
     </div>
   );
 }
 
-function Settings({ darkMode, onDarkModeChange, language, onLanguageChange, transactions, onDataRestored, onRequireLogin, t, storageMode, setStorageMode }) {
+function Settings({ darkMode, onDarkModeChange, language, onLanguageChange, transactions, onDataRestored, onRequireLogin, onSignOut, onSyncNow, lastSyncedAt, t, storageMode, setStorageMode }) {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [dbInfo, setDbInfo] = useState({ path: '', isCustom: false });
+  const [showExportModal, setShowExportModal] = useState(false);
   const restoreInputRef = useRef(null);
-  
-  const { isAuthenticated, isPro, upgradeToPro } = useAuth();
-  const { syncStatus, manualSync, isSyncing } = useSync();
 
-  // Load current DB path on mount
+  const { user, isAuthenticated, isPro } = useAuth();
+  const { syncStatus, manualSync, isSyncing } = useSync();
+  const plan = useSubscription()?.plan;   // ทน ๆ ไว้ เผื่อ Settings ถูกเรนเดอร์นอก provider
+  const [aiUsage, setAiUsage] = useState(null);
+
   React.useEffect(() => {
-    if (window.electronAPI?.getDbPath) {
-      window.electronAPI.getDbPath().then(setDbInfo).catch(() => { });
-    } else {
-      setDbInfo({ path: 'localStorage / Capacitor WebView', isCustom: false });
+    if (isAuthenticated) {
+      checkAiLimit().then(res => setAiUsage(res)).catch(() => {});
     }
+  }, [isAuthenticated]);
+
+  React.useEffect(() => {
+    setDbInfo({ path: 'localStorage / Capacitor WebView', isCustom: false });
   }, []);
 
   const run = async (fn) => {
@@ -63,61 +81,71 @@ function Settings({ darkMode, onDarkModeChange, language, onLanguageChange, tran
     finally { setLoading(false); }
   };
 
-  const handleUpgrade = () => run(async () => {
-    const res = await upgradeToPro();
-    if (res.success) {
-      setMessage('✅ Upgraded to Pro successfully!');
-    } else {
-      setMessage(res.error || 'Failed to upgrade');
-    }
-  });
-
   const handleSync = () => run(async () => {
+    if (onSyncNow) {
+      await onSyncNow();
+      setMessage(`✅ ${t.syncNowBtn}`);
+      return;
+    }
     const mergedTransactions = await manualSync(transactions);
     if (mergedTransactions) {
-      if (window.electronAPI && window.electronAPI.saveAllTransactions) {
-        await window.electronAPI.saveAllTransactions(mergedTransactions);
-      } else {
-        localStorage.setItem('webTransactions', JSON.stringify(mergedTransactions));
-      }
-      if (onDataRestored) {
-        await onDataRestored();
-      }
+      localStorage.setItem('webTransactions', JSON.stringify(mergedTransactions));
+      if (onDataRestored) await onDataRestored();
     }
   });
 
-  const handleExport = () => run(async () => {
-    if (window.electronAPI) {
-      const r = await window.electronAPI.exportToExcel();
-      setMessage(r.success ? `✅ ${r.path.split('/').pop()}` : (r.message || t.cancel));
+  const handleSignOut = () => {
+    if (!window.confirm(t.signOutConfirm)) return;
+    run(async () => { await onSignOut?.(); });
+  };
+
+  /**
+   * ลบบัญชีถาวร — Google Play บังคับให้แอปที่มีสมาชิกต้องมีปุ่มนี้
+   *
+   * ยืนยัน 3 ชั้น เพราะกู้คืนไม่ได้:
+   *   1. เตือนว่าจะเสียอะไรบ้าง + แนะให้ export ก่อน
+   *   2. ถ้ายังมีสมาชิกอยู่ บอกให้ไปยกเลิกที่ Play ก่อน (การลบบัญชีไม่หยุดการเรียกเก็บเงิน)
+   *   3. ให้พิมพ์คำยืนยัน — กันกดพลาด
+   */
+  const handleDeleteAccount = () => {
+    if (!window.confirm(t.deleteAccountWarning)) return;
+
+    if (plan && plan !== 'free') {
+      if (!window.confirm(t.deleteAccountSubActive)) return;
+    }
+
+    const typed = window.prompt(t.deleteAccountConfirmPrompt);
+    if (typed === null) return;                       // กด Cancel
+    if (typed.trim() !== t.deleteAccountConfirmWord) {
+      setMessage(t.deleteAccountMismatch);
       return;
     }
 
+    run(async () => {
+      setMessage(t.deleteAccountDeleting);
+      const { success, error } = await SupabaseService.deleteAccount();
+      if (!success) {
+        throw new Error(error?.message || t.deleteAccountFailed);
+      }
+      window.alert(t.deleteAccountSuccess);
+      // บัญชีหายไปแล้ว — พากลับหน้าแรกเพื่อให้แอปโหลด state ใหม่ทั้งหมด
+      window.location.replace('/');
+    });
+  };
+
+  const handleExport = () => run(async () => {
     const r = await exportTransactionsToExcelBrowser(transactions);
     setMessage(r.success ? `✅ ${r.filename}` : (r.message || t.cancel));
   });
 
   const handleBackup = () => run(async () => {
-    if (window.electronAPI) {
-      const r = await window.electronAPI.backupDatabase();
-      setMessage(r.success ? `✅ ${r.path.split('/').pop()}` : (r.message || t.cancel));
-      return;
-    }
-
     const r = await backupLocalDataBrowser();
     setMessage(r.success ? `✅ ${r.filename}` : (r.message || t.cancel));
   });
 
   const handleRestore = () => {
     if (!window.confirm(t.restoreConfirm)) return;
-    run(async () => {
-      if (window.electronAPI) {
-        const r = await window.electronAPI.restoreDatabase();
-        setMessage(r.success ? `✅ ${r.message}` : (r.message || t.cancel));
-      } else {
-        restoreInputRef.current?.click();
-      }
-    });
+    run(async () => { restoreInputRef.current?.click(); });
   };
 
   const handleRestoreFile = () => run(async () => {
@@ -128,43 +156,36 @@ function Settings({ darkMode, onDarkModeChange, language, onLanguageChange, tran
     setMessage(r.success ? `✅ ${r.message}` : (r.message || t.cancel));
   });
 
-  const handleChooseDb = () => run(async () => {
-    if (window.electronAPI) {
-      const r = await window.electronAPI.chooseDatabase();
-      if (r.success) {
-        setDbInfo({ path: r.path, isCustom: true });
-        setMessage(`✅ ${t.dbRestartNote}`);
-      } else {
-        setMessage(t.cancel);
-      }
-    }
-  });
-
-  const handleResetDb = () => run(async () => {
-    if (window.electronAPI) {
-      await window.electronAPI.resetDbPath();
-      const info = await window.electronAPI.getDbPath();
-      setDbInfo(info);
-      setMessage(`✅ ${t.dbRestartNote}`);
-    }
-  });
-
   const isSuccess = String(message || '').startsWith('✅');
 
-  const rowStyle = {
-    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-    padding: '16px 20px', background: 'var(--bg-card-inner)', borderRadius: '10px',
-    border: '1px solid var(--color-border)', gap: '16px', flexWrap: 'wrap',
-  };
+  const fullName = [user?.user_metadata?.firstName, user?.user_metadata?.lastName].filter(Boolean).join(' ');
+
+  const quotaItems = aiUsage ? [
+    {
+      label: t.quotaDaily,
+      value: `${aiUsage.usage?.dailyCount || 0} / ${aiUsage.limits?.ai_scans_per_day === Infinity ? '∞' : aiUsage.limits?.ai_scans_per_day}`,
+    },
+    {
+      label: t.quotaMonthly,
+      value: `${aiUsage.usage?.monthlyCount || 0} / ${aiUsage.limits?.ai_scans_per_month === Infinity ? '∞' : aiUsage.limits?.ai_scans_per_month}`,
+    },
+    ...(aiUsage.limits?.ai_scans_per_month !== Infinity ? [{
+      label: t.quotaRemaining,
+      value: `${Math.max(0, aiUsage.limits.ai_scans_per_month - (aiUsage.usage?.monthlyCount || 0))}`,
+      accent: true,
+    }] : []),
+  ] : [];
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', maxWidth: '680px' }}>
-      <div>
-        <h1 style={{ fontSize: '26px', fontWeight: '800', color: 'var(--color-text-primary)', letterSpacing: '-0.03em', margin: 0 }}>{t.settingsTitle}</h1>
-        <p style={{ color: 'var(--color-text-secondary)', fontSize: '14px', marginTop: '4px' }}>{t.settingsSubtitle}</p>
-      </div>
+    <div className="page page--narrow">
+      <header className="page-heading">
+        <div>
+          <span className="eyebrow">{t.settingsSubtitle}</span>
+          <h1>{t.settingsTitle}</h1>
+          <p>{t.settingsSubtitle}</p>
+        </div>
+      </header>
 
-      {/* Status message */}
       <input
         ref={restoreInputRef}
         type="file"
@@ -174,205 +195,238 @@ function Settings({ darkMode, onDarkModeChange, language, onLanguageChange, tran
       />
 
       {message && (
-        <div style={{
-          padding: '14px 18px', borderRadius: '10px',
-          background: isSuccess ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)',
-          border: `1px solid ${isSuccess ? 'rgba(16,185,129,0.25)' : 'rgba(239,68,68,0.25)'}`,
-          color: isSuccess ? '#059669' : '#dc2626', fontSize: '13.5px', fontWeight: '500',
-        }}>
-          {message}
-        </div>
+        <div className={`alert ${isSuccess ? 'alert-success' : 'alert-danger'}`}>{message}</div>
       )}
 
-      {/* Appearance */}
-      <SectionCard title={t.appearance}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          {/* Dark Mode */}
-          <div style={rowStyle}>
-            <div>
-              <div style={{ fontWeight: '600', fontSize: '14px', color: 'var(--color-text-primary)', marginBottom: '3px' }}>{t.darkMode}</div>
-              <div style={{ fontSize: '13px', color: 'var(--color-text-secondary)' }}>{darkMode ? t.darkModeOn : t.darkModeOff}</div>
+      {/* ── profile ── */}
+      <SectionCard title={t.userProfile}>
+        {isAuthenticated && user ? (
+          <div className="stack">
+            <div className="setting-row">
+              <div className="setting-row-copy">
+                <strong>{fullName || t.userLabel}</strong>
+                <p style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                  {user.email}
+                </p>
+                {user.user_metadata?.tel && (
+                  <p style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                    {user.user_metadata.tel}
+                  </p>
+                )}
+              </div>
+              <span className={`tag ${isPro ? 'tag-plan-pro' : 'tag-neutral'}`}>
+                {isPro ? 'PREMIUM' : 'FREE'}
+              </span>
             </div>
-            <ToggleSwitch checked={darkMode} onChange={onDarkModeChange} />
-          </div>
 
-          {/* Language */}
-          <div style={rowStyle}>
-            <div>
-              <div style={{ fontWeight: '600', fontSize: '14px', color: 'var(--color-text-primary)', marginBottom: '3px' }}>{t.languageLabel}</div>
-              <div style={{ fontSize: '13px', color: 'var(--color-text-secondary)' }}>{t.languageCurrent}</div>
+            {aiUsage && (
+              <div className="quota-card">
+                <div className="section-title-bar" style={{ marginBottom: 'var(--space-3)', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                  {t.aiUsageTitle}
+                </div>
+                <div className="quota-grid">
+                  {quotaItems.map(({ label, value, accent }) => (
+                    <div key={label} className="quota-item">
+                      <span>{label}</span>
+                      <strong className="num" style={accent ? { color: 'var(--accent-primary)' } : undefined}>{value}</strong>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="empty-state">
+            <div className="empty-state-icon" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+              <svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
             </div>
+            <p>{t.notLoggedInProfile}</p>
+            <button className="btn" style={{ marginTop: 'var(--space-3)' }} onClick={onRequireLogin}>
+              {t.loginToSync}
+            </button>
+          </div>
+        )}
+      </SectionCard>
+
+      {/* ── appearance ── */}
+      <SectionCard title={t.appearance}>
+        <div className="stack-sm">
+          <SettingRow title={t.darkMode} description={darkMode ? t.darkModeOn : t.darkModeOff}>
+            <ToggleSwitch checked={darkMode} onChange={onDarkModeChange} label={t.darkMode} />
+          </SettingRow>
+
+          <SettingRow title={t.languageLabel} description={t.languageCurrent}>
             <select
               value={language}
               onChange={e => onLanguageChange(e.target.value)}
-              style={{
-                padding: '8px 14px', border: '1.5px solid var(--color-border)', borderRadius: '8px',
-                fontSize: '13.5px', fontFamily: 'inherit', background: 'var(--bg-input)',
-                color: 'var(--color-text-primary)', outline: 'none', cursor: 'pointer',
-              }}
+              style={{ minWidth: '170px' }}
             >
-              <option value="th">🇹🇭 ภาษาไทย</option>
-              <option value="en">🇺🇸 English</option>
+              <option value="th">ภาษาไทย (TH)</option>
+              <option value="en">English (US)</option>
             </select>
-          </div>
+          </SettingRow>
         </div>
       </SectionCard>
 
-      {/* Cloud Sync (Pro) */}
-      <SectionCard title={t.syncTitle || 'คลาวด์ซิงค์ / Cloud Sync'}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          <div style={{ fontSize: '13px', color: 'var(--color-text-secondary)', marginBottom: '8px' }}>
-            {t.syncDesc || 'อัปโหลดและดาวน์โหลดข้อมูลธุรกรรมกับเซิร์ฟเวอร์'}
-          </div>
-          
-          {!isAuthenticated ? (
-            <div style={rowStyle}>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontWeight: '600', fontSize: '14px', color: 'var(--color-text-primary)', marginBottom: '3px' }}>{t.syncRequiresPro || 'ฟีเจอร์นี้สงวนไว้สำหรับสมาชิกโปรเท่านั้น'}</div>
-              </div>
-              <button className="btn" onClick={onRequireLogin} style={{ flexShrink: 0 }}>
-                {t.loginToSync || 'เข้าสู่ระบบ'}
-              </button>
-            </div>
-          ) : !isPro ? (
-            <div style={rowStyle}>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontWeight: '600', fontSize: '14px', color: 'var(--color-text-primary)', marginBottom: '3px' }}>{t.syncRequiresPro || 'ฟีเจอร์นี้สงวนไว้สำหรับสมาชิกโปรเท่านั้น'}</div>
-              </div>
-              <button className="btn" onClick={handleUpgrade} disabled={loading} style={{ flexShrink: 0 }}>
-                {loading ? t.loading : (t.upgradeToPro || 'อัปเกรดเป็น Pro')}
-              </button>
-            </div>
-          ) : (
-            <div style={rowStyle}>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontWeight: '600', fontSize: '14px', color: 'var(--color-text-primary)' }}>
-                  {t.syncStatus || 'สถานะซิงค์'}: <span style={{ color: isSyncing ? 'var(--accent-primary)' : 'var(--color-text-secondary)' }}>{syncStatus?.status || 'idle'}</span>
-                </div>
-                {syncStatus?.lastSync && (
-                  <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '4px' }}>
-                    {new Date(syncStatus.lastSync).toLocaleString()}
-                  </div>
-                )}
-                {syncStatus?.message && (
-                  <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '4px' }}>
-                    {syncStatus.message}
-                  </div>
+      {/* ── cloud sync ── */}
+      <SectionCard title={t.syncTitle}>
+        <p className="panel-subtitle" style={{ marginBottom: 'var(--space-4)' }}>
+          {t.syncDesc}
+        </p>
+
+        {!isAuthenticated ? (
+          <SettingRow
+            title={t.signInToSync}
+            description={t.signInToSyncDesc}
+          >
+            <button className="btn" onClick={onRequireLogin}>{t.loginToSync}</button>
+          </SettingRow>
+        ) : (
+          <SettingRow
+            title={t.syncStatus}
+            description={syncStatus?.message}
+            extra={
+              <div className="cluster" style={{ gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
+                <span className={`tag ${isSyncing ? 'tag-info' : syncStatus?.status === 'failed' ? 'tag-danger' : 'tag-success'}`}>
+                  {isSyncing
+                    ? t.syncStateSyncing
+                    : syncStatus?.status === 'failed'
+                      ? t.syncStateFailed
+                      : t.syncStateUpToDate}
+                </span>
+                {lastSyncedAt && (
+                  <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
+                    {new Date(lastSyncedAt).toLocaleString(language === 'th' ? 'th-TH' : 'en-US')}
+                  </span>
                 )}
               </div>
-              <button className="btn" onClick={handleSync} disabled={isSyncing || loading} style={{ flexShrink: 0 }}>
-                {isSyncing ? t.loading : (t.syncNowBtn || 'ซิงค์ข้อมูล')}
-              </button>
-            </div>
-          )}
-        </div>
+            }
+          >
+            <button className="btn" onClick={handleSync} disabled={isSyncing || loading}>
+              ⟳ {isSyncing ? t.loading : t.syncNowBtn}
+            </button>
+          </SettingRow>
+        )}
       </SectionCard>
 
-      {/* Export & Backup */}
+      {/* ── account ── */}
+      {isAuthenticated && (
+        <SectionCard title={t.accountSection}>
+          <SettingRow
+            title={t.signOutBtn}
+            description={t.signOutDesc}
+          >
+            <button className="btn btn-danger" onClick={handleSignOut} disabled={loading || isSyncing}>
+              {t.signOutBtn}
+            </button>
+          </SettingRow>
+
+          {/* ลบบัญชี — Google Play บังคับให้มีในแอป คู่กับหน้าเว็บ /delete-account.html */}
+          <SettingRow
+            title={t.deleteAccountTitle}
+            description={t.deleteAccountDesc}
+          >
+            <button
+              className="btn btn-danger"
+              onClick={handleDeleteAccount}
+              disabled={loading || isSyncing}
+            >
+              {t.deleteAccountBtn}
+            </button>
+          </SettingRow>
+        </SectionCard>
+      )}
+
+      {/* ── export & backup ── */}
       <SectionCard title={t.exportBackup}>
-        <div style={{ display: 'grid', gap: '12px' }}>
+        <div className="stack-sm">
+          <SettingRow title={t.customizeStatementBtn || "ปรับแต่งสเตทเมนต์ / แบบฟอร์มรายงาน"} description={t.customizeStatementDesc || "เลือกคอลัมน์ ใส่โลโก้/เลขผู้เสียภาษี และออกรายงานสเตทเมนต์ PDF/HTML มืออาชีพ"}>
+            <button className="btn" style={{ background: 'var(--accent-primary)', color: '#fff' }} onClick={() => setShowExportModal(true)}>
+              {t.customizeStatementBtn || "⚙️ ปรับแต่งแบบฟอร์ม & ส่งออก"}
+            </button>
+          </SettingRow>
+
           {[
             { title: t.exportExcelTitle, desc: t.exportExcelDesc, action: handleExport, label: t.exportExcelBtn },
             { title: t.backupTitle, desc: t.backupDesc, action: handleBackup, label: t.backupBtn },
             { title: t.restoreTitle, desc: t.restoreDesc, action: handleRestore, label: t.restoreBtn, danger: true },
           ].map(({ title, desc, action, label, danger }) => (
-            <div key={title} style={rowStyle}>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontWeight: '600', fontSize: '14px', color: 'var(--color-text-primary)', marginBottom: '3px' }}>{title}</div>
-                <div style={{ fontSize: '13px', color: 'var(--color-text-secondary)' }}>{desc}</div>
-              </div>
-              <button className={`btn ${danger ? 'btn-danger' : ''}`} onClick={action} disabled={loading} style={{ flexShrink: 0 }}>
+            <SettingRow key={title} title={title} description={desc}>
+              <button className={`btn ${danger ? 'btn-danger' : 'btn-ghost'}`} onClick={action} disabled={loading}>
                 {loading ? t.loading : label}
               </button>
-            </div>
+            </SettingRow>
           ))}
         </div>
       </SectionCard>
 
-      {/* Database */}
+      <ExportCustomizerModal
+        isOpen={showExportModal}
+        onClose={() => setShowExportModal(false)}
+        transactions={transactions}
+        t={t}
+      />
+
+      {/* ── database ── */}
       <SectionCard title={t.databaseSection}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          
-          <div style={rowStyle}>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontWeight: '600', fontSize: '14px', color: 'var(--color-text-primary)', marginBottom: '3px' }}>
-                {t.useCloudStorage || 'Secure Cloud DB (Pro)'}
-              </div>
-              <div style={{ fontSize: '13px', color: 'var(--color-text-secondary)' }}>
-                {t.useCloudStorageDesc || 'Bypass local save and work directly on Supabase cloud.'}
-              </div>
-            </div>
+        <div className="stack-sm">
+          <SettingRow
+            title={t.useCloudStorage || 'Secure Cloud DB (Pro)'}
+            description={t.useCloudStorageDesc || 'Bypass local save and work directly on Supabase cloud.'}
+          >
             <ToggleSwitch
               checked={storageMode === 'cloud'}
+              label={t.useCloudStorage}
               onChange={(val) => {
-                if (!isAuthenticated || !isPro) {
-                  onRequireLogin();
-                  return;
-                }
+                if (!isAuthenticated || !isPro) { onRequireLogin(); return; }
                 setStorageMode(val ? 'cloud' : 'local');
               }}
             />
-          </div>
+          </SettingRow>
 
-          {/* Current path display */}
-          <div style={{ padding: '12px 16px', background: 'var(--bg-card-inner)', borderRadius: '10px', border: '1px solid var(--color-border)' }}>
-            <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '6px' }}>
-              {t.dbCurrentPath} <span style={{ color: dbInfo.isCustom ? 'var(--accent-primary)' : 'var(--color-text-muted)', fontWeight: '700' }}>
+          <div className="code-block">
+            <span className="code-block-label">
+              {t.dbCurrentPath}{' '}
+              <b style={{ color: dbInfo.isCustom ? 'var(--accent-primary)' : 'var(--color-text-muted)' }}>
                 {dbInfo.isCustom ? t.dbCustom : t.dbDefault}
-              </span>
-            </div>
-            <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', wordBreak: 'break-all', fontFamily: 'monospace' }}>
-              {dbInfo.path || '…'}
-            </div>
+              </b>
+            </span>
+            <code>{dbInfo.path || '…'}</code>
           </div>
-
-          {/* Choose DB */}
-          {window.electronAPI && (
-            <div style={rowStyle}>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontWeight: '600', fontSize: '14px', color: 'var(--color-text-primary)', marginBottom: '3px' }}>{t.dbChooseBtn}</div>
-                <div style={{ fontSize: '13px', color: 'var(--color-text-secondary)' }}>{t.dbChooseDesc}</div>
-              </div>
-              <button className="btn" onClick={handleChooseDb} disabled={loading} style={{ flexShrink: 0 }}>
-                {loading ? t.loading : t.dbChooseBtn}
-              </button>
-            </div>
-          )}
-
-          {/* Reset DB */}
-          {window.electronAPI && dbInfo.isCustom && (
-            <div style={rowStyle}>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontWeight: '600', fontSize: '14px', color: 'var(--color-text-primary)', marginBottom: '3px' }}>{t.dbResetBtn}</div>
-                <div style={{ fontSize: '13px', color: 'var(--color-text-secondary)' }}>{t.dbResetDesc}</div>
-              </div>
-              <button className="btn btn-danger" onClick={handleResetDb} disabled={loading} style={{ flexShrink: 0 }}>
-                {loading ? t.loading : t.dbResetBtn}
-              </button>
-            </div>
-          )}
         </div>
       </SectionCard>
 
-      {/* About */}
+      {/* ── about ── */}
       <SectionCard title={t.aboutTitle}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-            <div style={{ width: '48px', height: '48px', borderRadius: '14px', background: 'var(--accent-gradient)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px', flexShrink: 0 }}>
-              💰
-            </div>
+        <div className="stack">
+          <div className="cluster" style={{ gap: 'var(--space-4)', flexWrap: 'nowrap' }}>
+            {/* ไอคอนจริงที่แอปใช้ (ตัวเดียวกับ manifest) ไม่ใช่อีโมจิ 💰 */}
+            <img
+              className="about-mark about-mark--icon"
+              src={APP_ICON}
+              alt={t.appName}
+              width={48}
+              height={48}
+            />
             <div>
-              <div style={{ fontWeight: '700', fontSize: '16px', color: 'var(--color-text-primary)', letterSpacing: '-0.02em' }}>{t.appName}</div>
-              <div style={{ fontSize: '13px', color: 'var(--color-text-secondary)', marginTop: '2px' }}>{t.appVersion}</div>
+              <strong style={{ fontSize: 'var(--text-md)', color: 'var(--color-text-primary)' }}>{t.appName}</strong>
+              <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)' }}>{t.appTagline}</p>
+              <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', marginTop: 'var(--space-1)' }}>
+                {APP_VERSION ? `${t.appVersion.replace('{v}', APP_VERSION)} · ` : ''}{t.appStack}
+              </p>
             </div>
           </div>
 
-          <div style={{ borderTop: '1px solid var(--color-divider)', paddingTop: '16px' }}>
-            <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '10px' }}>{t.featuresTitle}</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+          <div style={{ borderTop: '1px solid var(--color-divider)', paddingTop: 'var(--space-4)' }}>
+            <div className="section-title-bar" style={{ marginBottom: 'var(--space-3)' }}>{t.featuresTitle}</div>
+            <div className="feature-grid">
               {t.featureList.map(f => (
-                <div key={f} style={{ fontSize: '13px', color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  {f}
+                <div key={f} className="feature-item" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--accent-primary)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><polyline points="20 6 9 17 4 12"/></svg>
+                  <span>{f}</span>
                 </div>
               ))}
             </div>

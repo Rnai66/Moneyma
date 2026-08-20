@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import SupabaseService from '../services/SupabaseService';
 import { useAuth } from '../services/AuthContext';
+import { useSubscription } from '../SubscriptionContext/SubscriptionContext';
+import UpgradeModal from '../components/UpgradeModal';
+import { PLANS } from '../SubscriptionContext/SubscriptionService';
 
 const WEB_BUDGETS_KEY = 'webBudgets';
 
@@ -18,6 +21,8 @@ function writeWebBudgets(items) {
 
 function BudgetLimits({ transactions, t, storageMode }) {
   const { user } = useAuth();
+  const { plan } = useSubscription();
+  const [showUpgrade, setShowUpgrade] = useState(false);
   const [budgetStatus, setBudgetStatus] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
@@ -33,41 +38,33 @@ function BudgetLimits({ transactions, t, storageMode }) {
       if (storageMode === 'cloud' && user) {
         const { status } = await SupabaseService.getBudgetStatus(user.id, currentMonth);
         setBudgetStatus(status || []);
-      } else if (window.electronAPI) {
-        const data = await window.electronAPI.getBudgetStatus(currentMonth);
-        const statusList = data.map(b => ({
-          ...b,
-          used: b.spent,
-          status: b.isExceeded ? 'exceeded' : (b.isWarning ? 'warning' : 'ok')
-        }));
-        setBudgetStatus(statusList || []);
       } else {
         const allBudgets = readWebBudgets();
         const monthBudgets = allBudgets.filter(b => b.month === currentMonth);
-        
+
         const statusList = monthBudgets.map(budget => {
           const limitAmount = parseFloat(budget.limit);
           const alertThreshold = parseFloat(budget.alertThreshold) || 80;
-          
+
           const spent = transactions
             .filter(tx => tx.type === 'expense' && tx.category === budget.category && String(tx.date).startsWith(currentMonth))
             .reduce((sum, tx) => sum + parseFloat(tx.amount || 0), 0);
-            
+
           const percentage = limitAmount > 0 ? (spent / limitAmount) * 100 : 0;
           const isExceeded = spent > limitAmount;
           const isWarning = percentage >= alertThreshold && !isExceeded;
-          
+
           return {
             category: budget.category,
             limit: limitAmount,
-            alertThreshold: alertThreshold,
+            alertThreshold,
             used: spent,
             remaining: limitAmount - spent,
             percentage: Math.round(percentage),
-            status: isExceeded ? 'exceeded' : (isWarning ? 'warning' : 'ok')
+            status: isExceeded ? 'exceeded' : (isWarning ? 'warning' : 'ok'),
           };
         });
-        
+
         setBudgetStatus(statusList);
       }
     } catch (e) {
@@ -85,13 +82,20 @@ function BudgetLimits({ transactions, t, storageMode }) {
     try {
       setLoading(true);
       const limitVal = parseFloat(formData.limit);
-      const alertVal = parseInt(formData.alertThreshold);
+      const alertVal = parseInt(formData.alertThreshold, 10);
+
+      if (plan === 'free') {
+        const isEditing = budgetStatus.some(b => b.category === formData.category);
+        if (!isEditing && budgetStatus.length >= PLANS.free.limits.budgets) {
+          setShowUpgrade(true);
+          setLoading(false);
+          return;
+        }
+      }
 
       if (storageMode === 'cloud' && user) {
         const res = await SupabaseService.setBudget(user.id, formData.category, limitVal, alertVal, 'monthly');
         if (res.error) throw res.error;
-      } else if (window.electronAPI) {
-        await window.electronAPI.setBudget(formData.category, limitVal, currentMonth, alertVal);
       } else {
         const allBudgets = readWebBudgets();
         const filtered = allBudgets.filter(b => !(b.category === formData.category && b.month === currentMonth));
@@ -100,7 +104,7 @@ function BudgetLimits({ transactions, t, storageMode }) {
           category: formData.category,
           limit: limitVal,
           month: currentMonth,
-          alertThreshold: alertVal
+          alertThreshold: alertVal,
         });
         writeWebBudgets(filtered);
       }
@@ -122,12 +126,9 @@ function BudgetLimits({ transactions, t, storageMode }) {
         setLoading(true);
         if (storageMode === 'cloud' && user) {
           await SupabaseService.deleteBudget(user.id, category, 'monthly');
-        } else if (window.electronAPI) {
-          await window.electronAPI.deleteBudget(category, currentMonth);
         } else {
           const allBudgets = readWebBudgets();
-          const filtered = allBudgets.filter(b => !(b.category === category && b.month === currentMonth));
-          writeWebBudgets(filtered);
+          writeWebBudgets(allBudgets.filter(b => !(b.category === category && b.month === currentMonth)));
         }
         await loadBudgets();
       } catch (e) {
@@ -139,141 +140,210 @@ function BudgetLimits({ transactions, t, storageMode }) {
     }
   };
 
-  const inputStyle = {
-    padding: '9px 14px', border: '1.5px solid var(--color-border)', borderRadius: '8px',
-    fontSize: '13.5px', fontFamily: 'inherit', background: 'var(--bg-input)',
-    color: 'var(--color-text-primary)', outline: 'none', width: '100%',
+  const statusMeta = {
+    exceeded: { tone: 'is-danger', tag: 'tag-danger', color: 'var(--color-danger)', label: t.statusExceeded },
+    warning: { tone: 'is-warning', tag: 'tag-warning', color: 'var(--color-warning)', label: t.statusWarning },
+    ok: { tone: '', tag: 'tag-success', color: 'var(--color-success)', label: t.statusOnTrack },
   };
 
-  const statusConfig = {
-    exceeded: { color: '#ef4444', bg: 'rgba(239,68,68,0.1)', label: t.statusExceeded, gradient: 'linear-gradient(90deg,#ef4444,#dc2626)' },
-    warning: { color: '#f59e0b', bg: 'rgba(245,158,11,0.1)', label: t.statusWarning, gradient: 'linear-gradient(90deg,#f59e0b,#d97706)' },
-    ok: { color: '#10b981', bg: 'rgba(16,185,129,0.1)', label: t.statusOnTrack, gradient: 'linear-gradient(90deg,#10b981,#059669)' },
-  };
-
-  const getStatus = (b) => {
-    if (b.status === 'exceeded') return statusConfig.exceeded;
-    if (b.status === 'warning') return statusConfig.warning;
-    return statusConfig.ok;
-  };
+  const getStatus = (b) => statusMeta[b.status] || statusMeta.ok;
 
   const tips = [t.tip1, t.tip2, t.tip3, t.tip4];
 
+  const totals = budgetStatus.reduce((acc, b) => {
+    acc.limit += b.limit || 0;
+    acc.used += b.used || 0;
+    return acc;
+  }, { limit: 0, used: 0 });
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      <div>
-        <h1 style={{ fontSize: '26px', fontWeight: '800', color: 'var(--color-text-primary)', letterSpacing: '-0.03em', margin: 0 }}>{t.budgetTitle}</h1>
-        <p style={{ color: 'var(--color-text-secondary)', fontSize: '14px', marginTop: '4px' }}>{t.budgetSubtitle}</p>
-      </div>
-
-      {/* Month + Add Button */}
-      <div className="card" style={{ padding: '20px', flexDirection: 'row', alignItems: 'center', gap: '20px', flexWrap: 'wrap' }}>
-        <div className="filter-group" style={{ gap: '4px', flex: '0 0 auto' }}>
-          <label>{t.labelSelectMonth}</label>
-          <input type="month" value={currentMonth} onChange={e => setCurrentMonth(e.target.value)} style={{ ...inputStyle, width: 'auto' }} />
+    <div className="page">
+      <header className="page-heading">
+        <div>
+          <span className="eyebrow">{t.budgetSubtitle}</span>
+          <h1>{t.budgetTitle}</h1>
+          <p>{t.budgetSubtitle}</p>
         </div>
-        <button className="btn" onClick={() => setShowForm(!showForm)} disabled={loading} style={{ marginLeft: 'auto' }}>
-          {showForm ? `✕ ${t.cancel}` : t.setBudget}
-        </button>
-      </div>
+        <div className="page-heading-actions">
+          <div className="field">
+            <label>{t.labelSelectMonth}</label>
+            <input type="month" value={currentMonth} onChange={e => setCurrentMonth(e.target.value)} />
+          </div>
+          <button className="btn" onClick={() => setShowForm(!showForm)} disabled={loading} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+            {showForm ? (
+              <>
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                {t.cancel}
+              </>
+            ) : `+ ${t.setBudget}`}
+          </button>
+        </div>
+      </header>
 
-      {/* Form */}
+      {budgetStatus.length > 0 && (
+        <section className="metrics-strip">
+          <div className="metric-tile">
+            <span>{t.budgetStatus}</span>
+            <strong className="num">{budgetStatus.length}</strong>
+          </div>
+          <div className="metric-tile expense">
+            <span>{t.totalExpense}</span>
+            <strong className="num">{fmt(totals.used)}</strong>
+          </div>
+          <div className="metric-tile">
+            <span>{t.labelBudgetLimit}</span>
+            <strong className="num">{fmt(totals.limit)}</strong>
+          </div>
+          <div className="metric-tile">
+            <span>{t.remaining}</span>
+            <strong
+              className="num"
+              style={{ color: totals.limit - totals.used < 0 ? 'var(--color-danger)' : 'var(--color-success)' }}
+            >
+              {fmt(totals.limit - totals.used)}
+            </strong>
+          </div>
+        </section>
+      )}
+
       {showForm && (
-        <div className="card" style={{ padding: '24px' }}>
-          <h3 style={{ margin: '0 0 20px', fontWeight: '700', fontSize: '16px', color: 'var(--color-text-primary)', letterSpacing: '-0.02em' }}>
-            {t.setBudgetForm}
-          </h3>
-          <form onSubmit={handleSubmit} style={{ display: 'grid', gap: '16px' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px' }}>
-              <div className="filter-group">
+        <section className="panel">
+          <div className="panel-header" style={{ marginBottom: 'var(--space-4)' }}>
+            <span className="section-title-bar">{t.setBudgetForm}</span>
+          </div>
+
+          <form onSubmit={handleSubmit} className="stack">
+            <div className="filter-bar">
+              <div className="field">
                 <label>{t.labelBudgetCategory}</label>
-                <select value={formData.category} onChange={e => setFormData({ ...formData, category: e.target.value })} disabled={loading} required style={inputStyle}>
+                <select value={formData.category} onChange={e => setFormData({ ...formData, category: e.target.value })} disabled={loading} required>
                   <option value="">{t.selectCategory}</option>
                   {expenseCategories.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
               </div>
-              <div className="filter-group">
+              <div className="field">
                 <label>{t.labelBudgetLimit}</label>
-                <input type="number" step="100" placeholder="5,000" value={formData.limit} onChange={e => setFormData({ ...formData, limit: e.target.value })} disabled={loading} required style={inputStyle} />
+                <input type="number" step="100" placeholder="5,000" value={formData.limit} onChange={e => setFormData({ ...formData, limit: e.target.value })} disabled={loading} required />
               </div>
-              <div className="filter-group">
+              <div className="field">
                 <label>{t.labelAlertAt}</label>
-                <input type="number" min="0" max="100" value={formData.alertThreshold} onChange={e => setFormData({ ...formData, alertThreshold: e.target.value })} disabled={loading} style={inputStyle} />
+                <input type="number" min="0" max="100" value={formData.alertThreshold} onChange={e => setFormData({ ...formData, alertThreshold: e.target.value })} disabled={loading} />
               </div>
             </div>
-            <div style={{ fontSize: '13px', color: 'var(--color-text-secondary)', padding: '10px 14px', background: 'var(--bg-card-inner)', borderRadius: '8px', border: '1px solid var(--color-border)' }}>
-              💡 {t.alertHint.replace('{pct}', formData.alertThreshold)}
+
+            <div className="alert alert-info">
+              <span style={{ display: 'inline-flex', alignItems: 'center', marginRight: '6px' }}>
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2a7 7 0 0 0-7 7c0 2.38 1.19 4.47 3 5.74V17a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-2.26c1.81-1.27 3-3.36 3-5.74a7 7 0 0 0-7-7z"/><line x1="9" y1="21" x2="15" y2="21"/></svg>
+              </span>
+              {t.alertHint.replace('{pct}', formData.alertThreshold)}
             </div>
-            <button type="submit" className="btn" disabled={loading} style={{ width: 'fit-content' }}>
-              {loading ? t.saving : t.setBudgetBtn}
-            </button>
+
+            <div className="cluster">
+              <button type="submit" className="btn" disabled={loading}>
+                {loading ? t.saving : t.setBudgetBtn}
+              </button>
+              <button type="button" className="btn btn-ghost" onClick={() => setShowForm(false)} disabled={loading}>
+                {t.cancel}
+              </button>
+            </div>
           </form>
-        </div>
+        </section>
       )}
 
-      {/* Budget Status */}
-      <div className="card" style={{ padding: '24px' }}>
-        <span className="section-title-bar" style={{ marginBottom: '24px', display: 'flex' }}>{t.budgetStatus}</span>
+      <section className="panel">
+        <div className="panel-header">
+          <span className="section-title-bar">{t.budgetStatus}</span>
+          <span className="mini-badge">{currentMonth}</span>
+        </div>
+
         {budgetStatus && budgetStatus.length > 0 ? (
-          <div style={{ display: 'grid', gap: '16px' }}>
+          <div className="grid grid-auto-lg">
             {budgetStatus.map(b => {
               const st = getStatus(b);
               const pct = Math.min(b.percentage, 100);
+
               return (
-                <div key={b.category} style={{ padding: '20px', background: 'var(--bg-card-inner)', borderRadius: '12px', border: `1px solid var(--color-border)`, borderLeftWidth: '4px', borderLeftColor: st.color }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
+                <article key={b.category} className="budget-card" style={{ borderLeftColor: st.color }}>
+                  <div className="cluster-between" style={{ alignItems: 'flex-start' }}>
                     <div>
-                      <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--color-text-primary)', marginBottom: '4px', letterSpacing: '-0.01em' }}>{b.category}</div>
-                      <span style={{ display: 'inline-flex', alignItems: 'center', padding: '2px 10px', borderRadius: '999px', fontSize: '11.5px', fontWeight: '600', background: st.bg, color: st.color }}>
-                        {st.label}
-                      </span>
+                      <strong className="budget-card-title">{b.category}</strong>
+                      <span className={`tag ${st.tag}`}>{st.label}</span>
                     </div>
-                    <button onClick={() => handleDelete(b.category)} disabled={loading}
-                      style={{ padding: '5px 10px', fontSize: '12px', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '6px', cursor: 'pointer', color: '#ef4444' }}>
-                      🗑️
+                    <button
+                      onClick={() => handleDelete(b.category)}
+                      disabled={loading}
+                      className="icon-btn danger"
+                      title={t.delete}
+                    >
+                      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
                     </button>
                   </div>
-                  <div style={{ marginBottom: '16px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '13px' }}>
-                      <span style={{ fontWeight: '600', color: 'var(--color-text-primary)' }}>
-                        {fmt(b.used)} <span style={{ fontWeight: '400', color: 'var(--color-text-secondary)' }}>/ {fmt(b.limit)}</span>
+
+                  <div>
+                    <div className="cluster-between" style={{ marginBottom: 'var(--space-2)' }}>
+                      <span className="num" style={{ fontWeight: 650, color: 'var(--color-text-primary)' }}>
+                        {fmt(b.used)}{' '}
+                        <span style={{ fontWeight: 400, color: 'var(--color-text-muted)' }}>/ {fmt(b.limit)}</span>
                       </span>
-                      <span style={{ fontWeight: '700', color: st.color }}>{b.percentage}%</span>
+                      <span className="num" style={{ fontWeight: 800, color: st.color }}>{b.percentage}%</span>
                     </div>
-                    <div style={{ width: '100%', height: '8px', background: 'var(--color-border)', borderRadius: '999px', overflow: 'hidden' }}>
-                      <div style={{ width: `${pct}%`, height: '100%', background: st.gradient, borderRadius: '999px', transition: 'width 0.4s ease' }} />
-                    </div>
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                    <div style={{ padding: '12px', background: 'var(--bg-card)', borderRadius: '8px', border: '1px solid var(--color-border)' }}>
-                      <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>{t.remaining}</div>
-                      <div style={{ fontSize: '16px', fontWeight: '800', color: b.remaining < 0 ? '#ef4444' : '#10b981', letterSpacing: '-0.02em' }}>{fmt(b.remaining)}</div>
-                    </div>
-                    <div style={{ padding: '12px', background: 'var(--bg-card)', borderRadius: '8px', border: '1px solid var(--color-border)' }}>
-                      <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>{t.alertAtLabel}</div>
-                      <div style={{ fontSize: '16px', fontWeight: '800', color: '#6366f1', letterSpacing: '-0.02em' }}>{fmt((b.limit * b.alertThreshold) / 100)}</div>
+                    <div className="progress">
+                      <div className={`progress-fill ${st.tone}`} style={{ width: `${pct}%` }} />
                     </div>
                   </div>
-                </div>
+
+                  <div className="grid grid-2" style={{ gap: 'var(--space-3)' }}>
+                    <div className="budget-stat">
+                      <span>{t.remaining}</span>
+                      <strong className="num" style={{ color: b.remaining < 0 ? 'var(--color-danger)' : 'var(--color-success)' }}>
+                        {fmt(b.remaining)}
+                      </strong>
+                    </div>
+                    <div className="budget-stat">
+                      <span>{t.alertAtLabel}</span>
+                      <strong className="num" style={{ color: 'var(--accent-primary)' }}>
+                        {fmt((b.limit * b.alertThreshold) / 100)}
+                      </strong>
+                    </div>
+                  </div>
+                </article>
               );
             })}
           </div>
         ) : (
-          <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--color-text-secondary)' }}>
-            <div style={{ fontSize: '40px', opacity: 0.25, marginBottom: '12px' }}>💰</div>
-            <p style={{ fontWeight: '600', fontSize: '15px', marginBottom: '6px', color: 'var(--color-text-primary)' }}>{t.noBudgetsYet}</p>
-            <p style={{ fontSize: '13px' }}>{t.noBudgetsHint}</p>
+          <div className="empty-state">
+            <div className="empty-state-icon" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+              <svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="12" cy="12" r="10"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><line x1="12" y1="6" x2="12" y2="18"/></svg>
+            </div>
+            <strong>{t.noBudgetsYet}</strong>
+            <p>{t.noBudgetsHint}</p>
+            {!showForm && (
+              <button className="btn" style={{ marginTop: 'var(--space-3)' }} onClick={() => setShowForm(true)}>
+                + {t.setBudget}
+              </button>
+            )}
           </div>
         )}
-      </div>
+      </section>
 
-      {/* Tips */}
-      <div className="card" style={{ padding: '20px', background: 'rgba(99,102,241,0.04)', borderColor: 'rgba(99,102,241,0.15)' }}>
-        <h3 style={{ margin: '0 0 12px', fontSize: '14px', fontWeight: '700', color: 'var(--accent-primary)' }}>💡 {t.budgetTips}</h3>
-        <ul style={{ color: 'var(--color-text-secondary)', fontSize: '13.5px', padding: '0 0 0 18px', margin: 0 }}>
-          {tips.map((tip, i) => <li key={i} style={{ lineHeight: '2' }}>{tip}</li>)}
+      <section className="panel tips-panel">
+        <div className="section-title-bar" style={{ color: 'var(--accent-primary)', marginBottom: 'var(--space-3)', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2a7 7 0 0 0-7 7c0 2.38 1.19 4.47 3 5.74V17a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-2.26c1.81-1.27 3-3.36 3-5.74a7 7 0 0 0-7-7z"/><line x1="9" y1="21" x2="15" y2="21"/></svg>
+          {t.budgetTips}
+        </div>
+        <ul className="tips-list">
+          {tips.map((tip, i) => <li key={i}>{tip}</li>)}
         </ul>
-      </div>
+      </section>
+
+      <UpgradeModal
+        isOpen={showUpgrade}
+        onClose={() => setShowUpgrade(false)}
+        title={`⚠️ ${t.budgetLimitTitle}`}
+        description={t.budgetLimitDesc}
+        feature="budget_limits"
+        t={t}
+      />
     </div>
   );
 }

@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MoneyMa Business & Ledger — คู่มือและรายงานการใช้งานแอปพลิเคชันฉบับสมบูรณ์ (Production Guide v2.2.1)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sarabun:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&display=swap" rel="stylesheet">
+  
+  <style>
+    :root {
+      --primary: #059669;
+      --primary-dark: #047857;
+      --primary-light: #d1fae5;
+      --accent: #6366f1;
+      --accent-dark: #4f46e5;
+      --dark: #0f172a;
+      --text-main: #1e293b;
+      --text-muted: #64748b;
+      --bg-body: #f8fafc;
+      --bg-card: #ffffff;
+      --border: #e2e8f0;
+      --shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.03);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Sarabun', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: var(--bg-body);
+      color: var(--text-main);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Action Floating Bar for Printing / PDF Export */
+    .print-bar {
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+      background: rgba(15, 23, 42, 0.92);
+      backdrop-filter: blur(12px);
+      color: #fff;
+      padding: 14px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+    }
+
+    .print-bar-info {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .print-bar-logo {
+      width: 32px;
+      height: 32px;
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 16px;
+      color: #fff;
+    }
+
+    .print-btn {
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      color: #fff;
+      border: none;
+      padding: 10px 22px;
+      border-radius: 10px;
+      font-family: 'Sarabun', sans-serif;
+      font-weight: 700;
+      font-size: 14px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35);
+      transition: all 0.2s ease;
+    }
+
+    .print-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 18px rgba(16, 185, 129, 0.45);
+    }
+
+    .container {
+      max-width: 1100px;
+      margin: 40px auto;
+      padding: 0 24px;
+    }
+
+    /* Cover Header */
+    .cover-header {
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+      color: #fff;
+      border-radius: 28px;
+      padding: 48px;
+      margin-bottom: 40px;
+      box-shadow: 0 20px 40px rgba(15, 23, 42, 0.18);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .cover-header::before {
+      content: '';
+      position: absolute;
+      top: -100px;
+      right: -100px;
+      width: 350px;
+      height: 350px;
+      background: radial-gradient(circle, rgba(16, 185, 129, 0.25) 0%, rgba(0,0,0,0) 70%);
+      border-radius: 50%;
+    }
+
+    .brand-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid rgba(16, 185, 129, 0.4);
+      color: #34d399;
+      padding: 6px 14px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 700;
+      margin-bottom: 16px;
+    }
+
+    .cover-title {
+      font-size: 36px;
+      font-weight: 800;
+      line-height: 1.25;
+      margin-bottom: 12px;
+      background: linear-gradient(135deg, #ffffff 0%, #cbd5e1 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .cover-subtitle {
+      font-size: 16px;
+      color: #94a3b8;
+      max-width: 750px;
+      margin-bottom: 28px;
+    }
+
+    .specs-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+      padding-top: 24px;
+    }
+
+    .spec-item {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .spec-label {
+      font-size: 12px;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .spec-val {
+      font-size: 15px;
+      font-weight: 700;
+      color: #f8fafc;
+    }
+
+    /* Section Cards */
+    .section-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      padding: 36px;
+      margin-bottom: 36px;
+      box-shadow: var(--shadow);
+      page-break-inside: avoid;
+    }
+
+    .section-header {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 24px;
+      border-bottom: 2px solid #f1f5f9;
+      padding-bottom: 16px;
+    }
+
+    .section-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 14px;
+      background: #ecfdf5;
+      color: #059669;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      font-weight: 800;
+      flex-shrink: 0;
+    }
+
+    .section-title-wrap h2 {
+      font-size: 22px;
+      font-weight: 800;
+      color: var(--dark);
+      margin-bottom: 2px;
+    }
+
+    .section-title-wrap p {
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      margin-bottom: 24px;
+    }
+
+    @media (max-width: 850px) {
+      .feature-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .feature-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .feature-list li {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      font-size: 14px;
+      color: #334155;
+    }
+
+    .feature-list li::before {
+      content: '✓';
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: #dcfce7;
+      color: #15803d;
+      font-weight: 800;
+      font-size: 12px;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    .screenshot-frame {
+      border: 1px solid #cbd5e1;
+      border-radius: 18px;
+      overflow: hidden;
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.08);
+      background: #0f172a;
+    }
+
+    .screenshot-frame-bar {
+      background: #1e293b;
+      padding: 8px 14px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+
+    .dot-red { background: #ef4444; }
+    .dot-yellow { background: #f59e0b; }
+    .dot-green { background: #10b981; }
+
+    .screenshot-frame img {
+      width: 100%;
+      height: auto;
+      display: block;
+      object-fit: cover;
+    }
+
+    .caption {
+      font-size: 12px;
+      color: var(--text-muted);
+      text-align: center;
+      margin-top: 10px;
+      font-style: italic;
+    }
+
+    /* Comparison Table */
+    .custom-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 16px;
+      font-size: 13px;
+    }
+
+    .custom-table th {
+      background: #f8fafc;
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 700;
+      color: #475569;
+      border-bottom: 2px solid #e2e8f0;
+    }
+
+    .custom-table td {
+      padding: 12px 16px;
+      border-bottom: 1px solid #f1f5f9;
+      vertical-align: middle;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .badge-green { background: #dcfce7; color: #15803d; }
+    .badge-blue { background: #dbeafe; color: #1e40af; }
+    .badge-purple { background: #f3e8ff; color: #6b21a8; }
+
+    /* Footer */
+    .doc-footer {
+      text-align: center;
+      padding: 32px 0 60px;
+      color: var(--text-muted);
+      font-size: 13px;
+      border-top: 1px solid #e2e8f0;
+      margin-top: 40px;
+    }
+
+    /* Print CSS Styles for Perfect PDF Output */
+    @media print {
+      .print-bar {
+        display: none !important;
+      }
+      body {
+        background: #ffffff !important;
+      }
+      .container {
+        margin: 0 !important;
+        max-width: 100% !important;
+        padding: 0 !important;
+      }
+      .section-card {
+        box-shadow: none !important;
+        border: 1px solid #cbd5e1 !important;
+        page-break-inside: avoid !important;
+        margin-bottom: 20px !important;
+        padding: 24px !important;
+      }
+      .cover-header {
+        box-shadow: none !important;
+        padding: 32px !important;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Action Bar -->
+  <div class="print-bar">
+    <div class="print-bar-info">
+      <div class="print-bar-logo">M</div>
+      <div>
+        <strong style="font-size: 15px; display: block;">MoneyMa Business & Ledger Guide</strong>
+        <span style="font-size: 11px; opacity: 0.8;">เวอร์ชัน 2.2.1 (Store & Customer Production Documentation)</span>
+      </div>
+    </div>
+    <button class="print-btn" onclick="window.print()">
+      🖨️ พิมพ์เอกสาร / บันทึกเป็น PDF
+    </button>
+  </div>
+
+  <div class="container">
+    
+    <!-- COVER HEADER -->
+    <header class="cover-header">
+      <div class="brand-tag">✨ STORE READY & ENTERPRISE AUDITED</div>
+      <h1 class="cover-title">MoneyMa POS & Financial Ledger</h1>
+      <p class="cover-subtitle">
+        คู่มือและการแสดงผลการใช้งานระบบบริหารบัญชีรายรับ-รายจ่าย คลังสินค้า Multi-Warehouse ระบบขายหน้าร้าน (POS) ออกใบสั่งซื้อ (PO) และระบบวิเคราะห์การเงินอัจฉริยะฉบับสมบูรณ์
+      </p>
+
+      <div class="specs-grid">
+        <div class="spec-item">
+          <span class="spec-label">แอปพลิเคชัน</span>
+          <span class="spec-val">MoneyMa (v2.2.1)</span>
+        </div>
+        <div class="spec-item">
+          <span class="spec-label">แพลตฟอร์ม</span>
+          <span class="spec-val">Android (Build 18) / iOS (Build 6) / Web</span>
+        </div>
+        <div class="spec-item">
+          <span class="spec-label">ฐานข้อมูลคลาวด์</span>
+          <span class="spec-val">Supabase SQL (RLS Security Enabled)</span>
+        </div>
+        <div class="spec-item">
+          <span class="spec-label">ระบบชำระเงิน</span>
+          <span class="spec-val">RevenueCat In-App Purchases & PromptPay QR</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- MENU 1: DASHBOARD -->
+    <section class="section-card">
+      <div class="section-header">
+        <div class="section-icon">📊</div>
+        <div class="section-title-wrap">
+          <h2>1. เมนูแดชบอร์ดภาพรวมการเงิน (Financial Dashboard)</h2>
+          <p>สรุปสภาพคล่อง ยอดรายรับ รายจ่าย และภาพรวมธุรกิจประจำเดือน</p>
+        </div>
+      </div>
+
+      <div class="feature-grid">
+        <div>
+          <ul class="feature-list">
+            <li><strong>สรุปยอดเงินคงเหลือเรียลไทม์:</strong> คำนวณรายรับ-รายจ่ายสุทธิพร้อมเปรียบเทียบเปอร์เซ็นต์การเติบโต</li>
+            <li><strong>กราฟวิเคราะห์แนวโน้ม:</strong> แสดงแผนภูมิกระแสเงินสด (Cash Flow) และสัดส่วนค่าใช้จ่ายรายหมวดหมู่</li>
+            <li><strong>รายการสแกนด่วน:</strong> ปุ่มทางลัดสำหรับจดบันทึกและสแกนบิลด้วย AI Vision ได้ทันทีจากหน้าแรก</li>
+            <li><strong>ระบบแจ้งเตือนงบประมาณ:</strong> เตือนเมื่อการใช้จ่ายเข้าใกล้เพดาน Budget ที่ตั้งไว้</li>
+          </ul>
+        </div>
+        <div>
+          <div class="screenshot-frame">
+            <div class="screenshot-frame-bar">
+              <span class="dot dot-red"></span>
+              <span class="dot dot-yellow"></span>
+              <span class="dot dot-green"></span>
+            </div>
+            <img src="docs/images/media_1787129099744.png" alt="Dashboard Screenshot" />
+          </div>
+          <p class="caption">ภาพที่ 1: หน้าจอแดชบอร์ดสรุปภาพรวมรายรับ-รายจ่ายและกระแสเงินสดธุรกิจ</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- MENU 2: TRANSACTIONS & AI VISION -->
+    <section class="section-card">
+      <div class="section-header">
+        <div class="section-icon">📑</div>
+        <div class="section-title-wrap">
+          <h2>2. เมนูธุรกรรม & ระบบ AI สแกนสลิป/บิล (Transactions & AI Vision)</h2>
+          <p>บันทึกธุรกรรมทางการเงินและสแกนใบเสร็จด้วยปัญญาประดิษฐ์</p>
+        </div>
+      </div>
+
+      <div class="feature-grid">
+        <div>
+          <div class="screenshot-frame">
+            <div class="screenshot-frame-bar">
+              <span class="dot dot-red"></span>
+              <span class="dot dot-yellow"></span>
+              <span class="dot dot-green"></span>
+            </div>
+            <img src="docs/images/media_1787129099805.png" alt="Transactions Screenshot" />
+          </div>
+          <p class="caption">ภาพที่ 2: ระบบจัดการรายการธุรกรรมและการแยกหมวดหมู่อัตโนมัติ</p>
+        </div>
+        <div>
+          <ul class="feature-list">
+            <li><strong>🤖 AI Vision Slip Scanner:</strong> ถ่ายภาพสลิปธนาคารหรือใบเสร็จรับเงิน ระบบจะอ่านยอดเงิน วันที่ และช่องทางชำระเงินให้อัตโนมัติ</li>
+            <li><strong>ค้นหาและกรองข้อมูลขั้นสูง:</strong> กรองรายการตามวันที่, หมวดหมู่, หรือค้นหาตามคีย์เวิร์ด</li>
+            <li><strong>แนบรูปภาพหลักฐาน:</strong> รองรับการบันทึกภาพถ่ายสลิปประกอบรายการธุรกรรม</li>
+            <li><strong>ซิงก์ข้อมูลคลาวด์อัตโนมัติ:</strong> จัดเก็บลง Supabase SQL ทันที ป้องกันข้อมูลสูญหาย 100%</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- MENU 3: SUMMARY & FINANCIAL STATEMENTS -->
+    <section class="section-card">
+      <div class="section-header">
+        <div class="section-icon">📊</div>
+        <div class="section-title-wrap">
+          <h2>3. เมนูสรุป & งบการเงิน & ออกสเตทเม้นท์ (Summary & Financials)</h2>
+          <p>รายงานงบดุล งบกำไรขาดทุน และออกเอกสาร Statement (PDF / CSV / Excel)</p>
+        </div>
+      </div>
+
+      <div class="feature-grid">
+        <div>
+          <ul class="feature-list">
+            <li><strong>⚙️ Customize Statement Export:</strong> ปรับแต่งช่วงเวลา (รายวัน/รายเดือน/รายปี) และเลือกรวม/แยกหมวดหมู่ได้ตามต้องการ</li>
+            <li><strong>📄 Export ได้หลากหลายฟอร์แมต:</strong> รองรับการส่งออกเป็นไฟล์ PDF คุณภาพสูง, CSV สำหรับเปิดใน Excel, และรูปภาพ</li>
+            <li><strong>📲 PromptPay QR Code Generator:</strong> สร้างคิวอาร์โค้ดสแกนรับเงินพร้อมยอดสุทธิบนเอกสารให้อัตโนมัติ</li>
+          </ul>
+        </div>
+        <div>
+          <div class="screenshot-frame">
+            <div class="screenshot-frame-bar">
+              <span class="dot dot-red"></span>
+              <span class="dot dot-yellow"></span>
+              <span class="dot dot-green"></span>
+            </div>
+            <img src="docs/images/media_1787129099771.png" alt="Statement Export Customizer" />
+          </div>
+          <p class="caption">ภาพที่ 3: ระบบปรับแต่งการออกเอกสารสเตทเม้นท์และส่งออกรายงานการเงิน</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- MENU 4: INVENTORY, POS & PURCHASE ORDERS (PO) -->
+    <section class="section-card">
+      <div class="section-header">
+        <div class="section-icon">📦</div>
+        <div class="section-title-wrap">
+          <h2>4. เมนูคลังสินค้า POS ขายออก & PO ซื้อเข้า (Inventory, POS & Purchase Orders)</h2>
+          <p>ระบบบริหารสต็อกสินค้า 3 คลัง แคชเชียร์ขายหน้าร้าน ออกใบสั่งซื้อ และพิมพ์สลิป</p>
+        </div>
+      </div>
+
+      <div class="feature-grid" style="margin-bottom: 28px;">
+        <div>
+          <div class="screenshot-frame">
+            <div class="screenshot-frame-bar">
+              <span class="dot dot-red"></span>
+              <span class="dot dot-yellow"></span>
+              <span class="dot dot-green"></span>
+            </div>
+            <img src="docs/images/media_1787130849766.png" alt="Product Edit Modal" />
+          </div>
+          <p class="caption">ภาพที่ 4: ฟอร์มตั้งค่าสินค้า ระบบจัดสรร 3 คลังสินค้า และอัปโหลดรูปภาพ</p>
+        </div>
+        <div>
+          <div class="screenshot-frame">
+            <div class="screenshot-frame-bar">
+              <span class="dot dot-red"></span>
+              <span class="dot dot-yellow"></span>
+              <span class="dot dot-green"></span>
+            </div>
+            <img src="docs/images/media_1787131961424.png" alt="Sales POS Catalog Grid" />
+          </div>
+          <p class="caption">ภาพที่ 5: ระบบแคชเชียร์ขายหน้าร้าน (POS) การ์ดสินค้าสมดุล และระบบตัดสต็อก</p>
+        </div>
+      </div>
+
+      <table class="custom-table">
+        <thead>
+          <tr>
+            <th>ฟังก์ชันหลัก (Feature)</th>
+            <th>รายละเอียดการทำงาน (Capabilities)</th>
+            <th>สถานะฟีเจอร์</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>🏬 Multi-Warehouse (3 คลัง)</strong></td>
+            <td>จัดสรรจำนวนสินค้าแยกตามคลัง 1 (คลังหลัก), คลัง 2 (หน้าร้าน), คลัง 3 (สำรอง) ได้อย่างอิสระ</td>
+            <td><span class="badge badge-green">เปิดใช้งาน</span></td>
+          </tr>
+          <tr>
+            <td><strong>🖼️ Auto Image Resizer</strong></td>
+            <td>ย่อขนาดรูปภาพสินค้าอัตโนมัติ (Max 600x600px JPEG 82%) ประหยัด RAM และพื้นที่จัดเก็บ</td>
+            <td><span class="badge badge-green">เปิดใช้งาน</span></td>
+          </tr>
+          <tr>
+            <td><strong>🚚 Purchase Orders (PO)</strong></td>
+            <td>ออกใบสั่งซื้อสินค้าเข้าสต็อก ตัดรับสินค้าเข้าคลังที่เลือก คำนวณราคาทุนรวม และลงบัญชีรายจ่ายให้อัตโนมัติ</td>
+            <td><span class="badge badge-green">เปิดใช้งาน</span></td>
+          </tr>
+          <tr>
+            <td><strong>🖨️ Thermal Receipt Printing</strong></td>
+            <td>พิมพ์สลิปใบเสร็จรับเงินอย่างย่อ/ใบกำกับภาษีผ่านเครื่องพิมพ์ความร้อนแบบไร้สายและสาย USB</td>
+            <td><span class="badge badge-blue">พร้อมพิมพ์</span></td>
+          </tr>
+          <tr>
+            <td><strong>🖼️ JPG Exporter (SO & PO)</strong></td>
+            <td>แปลงใบสั่งขาย (SO) และใบสั่งซื้อ (PO) เป็นไฟล์รูปภาพ .jpg ความละเอียดสูงพร้อม PromptPay QR Code</td>
+            <td><span class="badge badge-purple">ส่งออกทันที</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- MENU 5: PREMIUM BUSINESS PLAN -->
+    <section class="section-card">
+      <div class="section-header">
+        <div class="section-icon">🎁</div>
+        <div class="section-title-wrap">
+          <h2>5. เมนูสิทธิ์ใช้งาน Business Plan & การสับเปลี่ยนแพ็กเกจ (Subscriptions)</h2>
+          <p>สิทธิ์ทดลองใช้งาน Business Plan ฟรี 7 วัน และการบริหารสิทธิ์สมาชิกผ่าน RevenueCat</p>
+        </div>
+      </div>
+
+      <div class="feature-grid">
+        <div>
+          <ul class="feature-list">
+            <li><strong>🎁 7-Day Free Trial:</strong> สิทธิ์ทดลองใช้งานฟีเจอร์ Business Plan ครบทุกฟังก์ชันฟรี 7 วัน</li>
+            <li><strong>🔒 Feature Gating:</strong> ปลดล็อกระบบสต็อกสินค้า, POS ขายออก, สแกนสินค้าด้วย AI และออกเอกสารได้ไม่จำกัด</li>
+            <li><strong>💳 RevenueCat Integration:</strong> รองรับการสมัครสมาชิกและตัดเงินผ่าน Google Play Billing & Apple In-App Purchase ปลอดภัยสูงสุด</li>
+          </ul>
+        </div>
+        <div>
+          <div class="screenshot-frame">
+            <div class="screenshot-frame-bar">
+              <span class="dot dot-red"></span>
+              <span class="dot dot-yellow"></span>
+              <span class="dot dot-green"></span>
+            </div>
+            <img src="docs/images/media_1787129099779.png" alt="Business Trial Modal" />
+          </div>
+          <p class="caption">ภาพที่ 6: หน้าต่างสิทธิ์ทดลองใช้งาน Business Plan ฟรี 7 วัน</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- MENU 6: SETTINGS & CLOUD SYNC -->
+    <section class="section-card">
+      <div class="section-header">
+        <div class="section-icon">⚙️</div>
+        <div class="section-title-wrap">
+          <h2>6. เมนูตั้งค่า & การเชื่อมต่อคลาวด์ Supabase (Settings & Security)</h2>
+          <p>ความปลอดภัยของข้อมูล การสำรองข้อมูล และการตั้งค่าแอปพลิเคชัน</p>
+        </div>
+      </div>
+
+      <div class="feature-grid">
+        <div>
+          <div class="screenshot-frame">
+            <div class="screenshot-frame-bar">
+              <span class="dot dot-red"></span>
+              <span class="dot dot-yellow"></span>
+              <span class="dot dot-green"></span>
+            </div>
+            <img src="docs/images/media_1787129099760.png" alt="Financial Summary & Settings" />
+          </div>
+          <p class="caption">ภาพที่ 7: หน้าตั้งค่าระบบและการจัดการสเตทเม้นท์การเงิน</p>
+        </div>
+        <div>
+          <ul class="feature-list">
+            <li><strong>🔒 Supabase Cloud RLS:</strong> ระบบความปลอดภัยระดับเอ็นเทอร์ไพรส์ แยกสิทธิ์ข้อมูลผู้ใช้ 100% ผ่าน `auth.uid() = user_id`</li>
+            <li><strong>📱 Native Edge-to-Edge API:</strong> แสดงผลแบบเต็มขอบจออย่างสวยงามบน Android 15 (API 35) และ iOS</li>
+            <li><strong>⚡ R8 Optimization:</strong> เพิ่มความเร็วและบีบอัดโค้ดด้วย R8 Minifier ประหยัดแบตเตอรี่และหน่วยความจำ</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- FOOTER -->
+    <footer class="doc-footer">
+      <p><strong>MoneyMa POS & Financial Ledger System (v2.2.1)</strong></p>
+      <p>พัฒนาและตรวจสอบมาตรฐานระบบเรียบร้อยแล้วสำหรับการเผยแพร่บน Google Play Store และ Apple App Store</p>
+      <p style="margin-top: 8px; font-size: 11px; opacity: 0.7;">© 2026 MoneyMa Inc. All rights reserved.</p>
+    </footer>
+
+  </div>
+
+</body>
+</html>

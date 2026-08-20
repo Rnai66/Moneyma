@@ -143,7 +143,7 @@ export async function batchScanFiles(files, { onProgress, signal } = {}) {
       onProgress?.({ current: i + 1, total: files.length, skipped, errors, lastResult: null });
     }
 
-    // Small delay to avoid rate limiting
+    // Fast delay for Pay-as-you-go API (supports 2000 RPM)
     if (i < files.length - 1) await new Promise((r) => setTimeout(r, 400));
   }
 

@@ -7,69 +7,52 @@
 @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
 
 /* ── Tokens ───────────────────────────────────────────────────────────────── */
+/* ── Tokens ───────────────────────────────────────────────────────────────── */
 .scan-slip {
-  --ss-font: 'IBM Plex Sans Thai', system-ui, sans-serif;
+  --ss-font: 'Manrope', 'IBM Plex Sans Thai', 'Noto Sans Thai', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --ss-font-mono: 'IBM Plex Mono', monospace;
 
-  /* Light */
-  --ss-bg: #f5f4f0;
-  --ss-surface: #ffffff;
-  --ss-surface-raised: #fafaf8;
-  --ss-border: rgba(0, 0, 0, 0.08);
-  --ss-border-strong: rgba(0, 0, 0, 0.15);
-  --ss-text: #1a1a18;
-  --ss-text-muted: #6b6b66;
-  --ss-text-hint: #9c9c96;
-  --ss-accent: #1a6b4a;
-  --ss-accent-light: #e8f5ef;
+  /* App theme token bindings (works in both dark & light mode) */
+  --ss-bg: transparent;
+  --ss-surface: var(--bg-card-inner, rgba(22, 33, 60, 0.65));
+  --ss-surface-raised: var(--bg-input, rgba(30, 42, 71, 0.85));
+  --ss-border: var(--color-border, rgba(168, 182, 240, 0.14));
+  --ss-border-strong: var(--color-border-strong, rgba(168, 182, 240, 0.25));
+  --ss-text: var(--color-text-primary, #f2f5ff);
+  --ss-text-muted: var(--color-text-secondary, #a6b2da);
+  --ss-text-hint: var(--color-text-muted, #7b88b6);
+  --ss-accent: #38bdf8;
+  --ss-accent-light: rgba(56, 189, 248, 0.14);
   --ss-accent-text: #ffffff;
-  --ss-danger: #c0392b;
-  --ss-danger-light: #fdf0ee;
-  --ss-warning-light: #fff9ec;
-  --ss-warning: #c47a1a;
-  --ss-tab-active-bg: #1a6b4a;
+  --ss-danger: var(--color-danger, #ff8f88);
+  --ss-danger-light: var(--color-danger-soft, rgba(255, 143, 136, 0.14));
+  --ss-warning-light: var(--color-warning-soft, rgba(255, 200, 95, 0.14));
+  --ss-warning: var(--color-warning, #ffc85f);
+  --ss-tab-active-bg: var(--accent-primary, #5570f1);
   --ss-tab-active-text: #ffffff;
-  --ss-scan-ring: #1a6b4a;
-  --ss-radius: 12px;
-  --ss-radius-sm: 8px;
-  --ss-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 4px 12px rgba(0,0,0,0.04);
+  --ss-scan-ring: #38bdf8;
+  --ss-radius: var(--radius-md, 16px);
+  --ss-radius-sm: var(--radius-xs, 10px);
+  --ss-shadow: var(--shadow-sm, 0 4px 16px rgba(0, 0, 0, 0.3));
 }
 
-@media (prefers-color-scheme: dark) {
-  .scan-slip {
-    --ss-bg: #141412;
-    --ss-surface: #1e1e1b;
-    --ss-surface-raised: #252522;
-    --ss-border: rgba(255, 255, 255, 0.07);
-    --ss-border-strong: rgba(255, 255, 255, 0.14);
-    --ss-text: #e8e6df;
-    --ss-text-muted: #9c9a92;
-    --ss-text-hint: #6b6a65;
-    --ss-accent: #2eb87a;
-    --ss-accent-light: #1a2e24;
-    --ss-accent-text: #0a1a11;
-    --ss-danger: #e05c4c;
-    --ss-danger-light: #2a1614;
-    --ss-warning-light: #1e1a10;
-    --ss-warning: #d49a3a;
-    --ss-tab-active-bg: #2eb87a;
-    --ss-tab-active-text: #0a1a11;
-    --ss-scan-ring: #2eb87a;
-    --ss-shadow: 0 1px 3px rgba(0,0,0,0.3), 0 4px 16px rgba(0,0,0,0.2);
-  }
+.app:not(.dark-mode) .scan-slip {
+  --ss-surface: #f8fafc;
+  --ss-surface-raised: #ffffff;
+  --ss-accent: #2563eb;
+  --ss-accent-light: rgba(37, 99, 235, 0.1);
+  --ss-tab-active-bg: #2563eb;
+  --ss-tab-active-text: #ffffff;
 }
 
 /* ── Shell ────────────────────────────────────────────────────────────────── */
 .scan-slip {
   display: flex;
   flex-direction: column;
-  height: 100%;
-  max-height: 100dvh;
-  background: var(--ss-bg);
+  background: transparent;
   font-family: var(--ss-font);
   color: var(--ss-text);
   -webkit-font-smoothing: antialiased;
-  overflow: hidden;
 }
 
 /* ── Header ───────────────────────────────────────────────────────────────── */
@@ -77,77 +60,82 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 20px 12px;
-  background: var(--ss-surface);
+  padding: 4px 4px 14px;
+  background: transparent;
   border-bottom: 1px solid var(--ss-border);
   flex-shrink: 0;
 }
 
 .scan-slip__title {
-  font-size: 17px;
-  font-weight: 600;
+  font-size: 18px;
+  font-weight: 700;
   margin: 0;
   letter-spacing: -0.01em;
+  color: var(--ss-text);
 }
 
 .scan-slip__close {
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  border: none;
+  border: 1px solid var(--ss-border);
   background: var(--ss-surface-raised);
   color: var(--ss-text-muted);
   font-size: 14px;
   cursor: pointer;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition: background 0.15s, color 0.15s;
+  transition: all 0.2s ease;
 }
 .scan-slip__close:hover {
   background: var(--ss-border-strong);
   color: var(--ss-text);
+  transform: scale(1.05);
 }
 
 /* ── Tabs ─────────────────────────────────────────────────────────────────── */
 .scan-slip__tabs {
   display: flex;
   background: var(--ss-surface);
-  border-bottom: 1px solid var(--ss-border);
-  flex-shrink: 0;
-  padding: 0 8px;
+  border-radius: var(--ss-radius);
+  padding: 4px;
   gap: 4px;
+  margin: 14px 0 6px;
+  border: 1px solid var(--ss-border);
 }
 
 .scan-slip__tab {
   flex: 1;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
-  gap: 4px;
-  padding: 10px 4px 12px;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 12px;
   border: none;
+  border-radius: var(--ss-radius-sm);
   background: transparent;
   color: var(--ss-text-muted);
   font-family: var(--ss-font);
-  font-size: 12px;
-  font-weight: 400;
+  font-size: 13px;
+  font-weight: 500;
   cursor: pointer;
-  border-bottom: 2px solid transparent;
-  margin-bottom: -1px;
-  transition: color 0.15s, border-color 0.15s;
-  position: relative;
+  transition: all 0.2s ease;
 }
 
 .scan-slip__tab-icon {
-  font-size: 18px;
+  font-size: 16px;
   line-height: 1;
+  display: inline-flex;
+  align-items: center;
 }
 
 .scan-slip__tab--active {
-  color: var(--ss-accent);
+  background: var(--ss-tab-active-bg);
+  color: var(--ss-tab-active-text);
   font-weight: 600;
-  border-bottom-color: var(--ss-accent);
+  box-shadow: 0 4px 14px rgba(85, 112, 241, 0.35);
 }
 
 /* ── Body ─────────────────────────────────────────────────────────────────── */
@@ -156,11 +144,11 @@
   overflow-y: auto;
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
+  padding-top: 8px;
 }
 
 .scan-slip__pane {
-  padding: 20px;
-  min-height: 100%;
+  padding: 8px 0;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -169,7 +157,7 @@
 /* ── Drop zone ────────────────────────────────────────────────────────────── */
 .scan-slip__drop-zone {
   flex: 1;
-  min-height: 280px;
+  min-height: 200px;
   border: 2px dashed var(--ss-border-strong);
   border-radius: var(--ss-radius);
   background: var(--ss-surface);
@@ -177,10 +165,10 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 10px;
   cursor: pointer;
-  transition: border-color 0.2s, background 0.2s;
-  padding: 32px 24px;
+  transition: all 0.2s ease;
+  padding: 28px 20px;
   text-align: center;
 }
 
@@ -188,18 +176,28 @@
 .scan-slip__drop-zone:focus-within {
   border-color: var(--ss-accent);
   background: var(--ss-accent-light);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
 }
 
 .scan-slip__drop-icon {
-  font-size: 48px;
-  line-height: 1;
-  margin-bottom: 8px;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--ss-accent-light);
+  color: var(--ss-accent);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+  margin-bottom: 4px;
 }
 
 .scan-slip__drop-title {
   font-size: 16px;
   font-weight: 600;
   margin: 0;
+  color: var(--ss-text);
 }
 
 .scan-slip__drop-hint {
@@ -416,13 +414,18 @@
 }
 
 .scan-slip__btn--primary {
-  background: var(--ss-accent);
-  color: var(--ss-accent-text);
+  background: linear-gradient(135deg, #5570f1 0%, #3e51c7 100%);
+  color: #ffffff;
+  font-weight: 600;
+  box-shadow: 0 4px 14px rgba(85, 112, 241, 0.35);
+  border-radius: var(--ss-radius-sm);
   flex: 1;
 }
 
 .scan-slip__btn--primary:hover:not(:disabled) {
-  opacity: 0.88;
+  opacity: 0.94;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(85, 112, 241, 0.45);
 }
 
 .scan-slip__btn--secondary {

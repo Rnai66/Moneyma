@@ -1,0 +1,349 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#0b1220" />
+  <meta name="description" content="ขอลบบัญชีและข้อมูล MoneyMa — Request account and data deletion" />
+  <title>MoneyMa — ขอลบบัญชีและข้อมูล / Delete your account and data</title>
+  <style>
+    :root {
+      --bg: #0b1220;
+      --panel: rgba(15,23,42,0.82);
+      --panel-strong: rgba(30,41,59,0.95);
+      --text: #e5eefc;
+      --muted: #a9b7d5;
+      --accent: #77a8ff;
+      --accent-2: #8ef0c8;
+      --warn: #ffb86b;
+      --border: rgba(169,183,213,0.18);
+      --shadow: 0 24px 60px rgba(0,0,0,0.28);
+      color-scheme: dark;
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Manrope, "Noto Sans Thai", "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(119,168,255,0.22), transparent 28%),
+        radial-gradient(circle at bottom right, rgba(142,240,200,0.12), transparent 24%),
+        var(--bg);
+      color: var(--text);
+      line-height: 1.75;
+    }
+    .page { max-width: 860px; margin: 0 auto; padding: 32px 20px 72px; }
+    .hero {
+      padding: 32px 28px;
+      border-radius: 28px;
+      background: linear-gradient(135deg, rgba(35,52,94,0.95), rgba(17,24,39,0.92));
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
+    }
+    .badge {
+      display: inline-block;
+      font-size: 11px; font-weight: 800;
+      text-transform: uppercase; letter-spacing: 0.14em;
+      color: var(--accent-2); margin-bottom: 10px;
+    }
+    h1 { margin: 0; font-size: clamp(1.7rem,4vw,2.7rem); line-height: 1.15; letter-spacing: -0.03em; }
+    .subtitle { margin: 12px 0 0; color: var(--muted); font-size: 1rem; max-width: 680px; }
+    .updated {
+      margin-top: 16px; display: inline-flex;
+      padding: 8px 14px; border-radius: 999px;
+      background: rgba(119,168,255,0.1); border: 1px solid rgba(119,168,255,0.2);
+      color: var(--text); font-size: 13px; font-weight: 700;
+    }
+    .lang-switch { margin-top: 18px; display: flex; gap: 8px; }
+    .lang-btn {
+      padding: 6px 16px; border-radius: 999px; border: 1px solid var(--border);
+      background: transparent; color: var(--muted); font-size: 13px; font-weight: 700;
+      cursor: pointer; transition: all 0.2s;
+    }
+    .lang-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .content section {
+      margin-top: 20px; padding: 24px; border-radius: 24px;
+      background: var(--panel); border: 1px solid var(--border);
+      box-shadow: var(--shadow); backdrop-filter: blur(18px);
+    }
+    .content h2 { margin: 0 0 12px; font-size: 1.15rem; letter-spacing: -0.02em; }
+    .content h3 { margin: 18px 0 6px; font-size: 0.95rem; color: var(--accent); font-weight: 700; }
+    p { margin: 10px 0; }
+    ul, ol { margin: 8px 0; padding-left: 20px; color: var(--muted); }
+    li + li { margin-top: 6px; }
+    .callout {
+      margin-top: 14px; padding: 14px 18px; border-radius: 16px;
+      background: var(--panel-strong); border: 1px solid rgba(142,240,200,0.16);
+      color: var(--muted); font-size: 14px;
+    }
+    .callout.warn { border-color: rgba(255,184,107,0.28); }
+    .callout.warn strong { color: var(--warn); }
+    code {
+      font-family: ui-monospace, Menlo, Consolas, monospace;
+      background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 6px; padding: 2px 6px;
+    }
+    .cta {
+      display: inline-flex; align-items: center; gap: 8px;
+      margin-top: 8px; padding: 14px 24px; border-radius: 999px;
+      background: var(--accent); color: #08122b;
+      font-weight: 800; font-size: 15px; text-decoration: none;
+      transition: transform 0.15s, filter 0.15s;
+    }
+    .cta:hover { transform: translateY(-1px); filter: brightness(1.08); }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 14px; }
+    th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+    th { color: var(--text); font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; }
+    td { color: var(--muted); }
+    .lang-content { display: none; }
+    .lang-content.active { display: block; }
+    footer { margin-top: 24px; color: var(--muted); font-size: 13px; text-align: center; }
+    footer a { color: var(--accent); }
+    @media (max-width: 640px) {
+      .page { padding: 16px 14px 56px; }
+      .hero, .content section { padding: 18px; border-radius: 18px; }
+      th, td { padding: 8px 6px; }
+    }
+  </style>
+</head>
+<body>
+<main class="page">
+
+  <header class="hero">
+    <span class="badge">MoneyMa · com.moneyma.app</span>
+    <h1>ขอลบบัญชีและข้อมูล<br><small style="font-size:0.5em;opacity:0.7">Delete your account and data</small></h1>
+    <p class="subtitle">MoneyMa — Personal Finance Manager · พัฒนาโดย rnaisys</p>
+    <div class="updated">อัปเดตล่าสุด / Last updated: 5 สิงหาคม 2026</div>
+    <div class="lang-switch">
+      <button class="lang-btn active" onclick="setLang('th')">ไทย</button>
+      <button class="lang-btn" onclick="setLang('en')">English</button>
+    </div>
+  </header>
+
+  <!-- ─── THAI ─────────────────────────────────────────────────── -->
+  <div id="lang-th" class="lang-content active">
+    <div class="content">
+
+      <section>
+        <h2>วิธีขอลบบัญชี</h2>
+        <p>คุณลบบัญชี MoneyMa และข้อมูลที่เกี่ยวข้องได้สองทาง เลือกทางไหนก็ได้ ผลลัพธ์เหมือนกัน</p>
+
+        <h3>ทางที่ 1 — ลบจากในแอป</h3>
+        <ol>
+          <li>เปิดแอป MoneyMa แล้วเข้าสู่ระบบ</li>
+          <li>ไปที่ <strong>การตั้งค่า (Settings)</strong></li>
+          <li>ในหมวด <strong>บัญชีผู้ใช้</strong> เลือก <strong>ลบบัญชี</strong></li>
+          <li>ยืนยันตามที่แอปแจ้ง</li>
+        </ol>
+
+        <h3>ทางที่ 2 — ส่งคำขอทางอีเมล</h3>
+        <p>ถ้าคุณถอนการติดตั้งแอปไปแล้ว หรือเข้าสู่ระบบไม่ได้ ให้ส่งคำขอมาที่อีเมลด้านล่าง</p>
+        <p>
+          <a class="cta" href="mailto:naiguitarfolk@gmail.com?subject=%E0%B8%84%E0%B8%B3%E0%B8%82%E0%B8%AD%E0%B8%A5%E0%B8%9A%E0%B8%9A%E0%B8%B1%E0%B8%8D%E0%B8%8A%E0%B8%B5%20MoneyMa&body=%E0%B8%AD%E0%B8%B5%E0%B9%80%E0%B8%A1%E0%B8%A5%E0%B8%97%E0%B8%B5%E0%B9%88%E0%B8%A5%E0%B8%87%E0%B8%97%E0%B8%B0%E0%B9%80%E0%B8%9A%E0%B8%B5%E0%B8%A2%E0%B8%99%3A%20%0A%0A%E0%B8%82%E0%B9%89%E0%B8%B2%E0%B8%9E%E0%B9%80%E0%B8%88%E0%B9%89%E0%B8%B2%E0%B8%82%E0%B8%AD%E0%B9%83%E0%B8%AB%E0%B9%89%E0%B8%A5%E0%B8%9A%E0%B8%9A%E0%B8%B1%E0%B8%8D%E0%B8%8A%E0%B8%B5%20MoneyMa%20%E0%B9%81%E0%B8%A5%E0%B8%B0%E0%B8%82%E0%B9%89%E0%B8%AD%E0%B8%A1%E0%B8%B9%E0%B8%A5%E0%B8%97%E0%B8%B1%E0%B9%89%E0%B8%87%E0%B8%AB%E0%B8%A1%E0%B8%94">
+            ส่งคำขอลบบัญชี
+          </a>
+        </p>
+        <p>หรือส่งเองมาที่ <code>naiguitarfolk@gmail.com</code> โดยระบุ:</p>
+        <ul>
+          <li>หัวข้ออีเมล: <strong>คำขอลบบัญชี MoneyMa</strong></li>
+          <li><strong>อีเมลที่ใช้ลงทะเบียนในแอป</strong> (ต้องส่งจากอีเมลนั้นเพื่อยืนยันตัวตน)</li>
+        </ul>
+        <div class="callout">
+          เราจะยืนยันตัวตนของคุณและดำเนินการลบให้ภายใน <strong>30 วัน</strong> นับจากวันที่ได้รับคำขอ
+          และจะแจ้งกลับทางอีเมลเมื่อดำเนินการเสร็จ
+        </div>
+      </section>
+
+      <section>
+        <h2>ข้อมูลที่จะถูกลบ</h2>
+        <p>เมื่อคำขอได้รับการดำเนินการ ข้อมูลต่อไปนี้จะถูกลบออกจากระบบของเราอย่างถาวร</p>
+        <ul>
+          <li>บัญชีผู้ใช้และข้อมูลการยืนยันตัวตน (อีเมล, User ID)</li>
+          <li>รายการรายรับและรายจ่ายทั้งหมดที่ซิงก์ขึ้นคลาวด์</li>
+          <li>หมวดหมู่ งบประมาณ และการตั้งค่าที่กำหนดเอง</li>
+          <li>ข้อมูลที่ได้จากการสแกนสลิปซึ่งบันทึกไว้ในบัญชี</li>
+          <li>การตั้งค่าแอป เช่น ภาษาและธีม ที่เก็บอยู่ในบัญชี</li>
+        </ul>
+        <div class="callout">
+          ข้อมูลที่เก็บอยู่ <strong>บนอุปกรณ์ของคุณเท่านั้น</strong> จะถูกลบเมื่อคุณถอนการติดตั้งแอป
+          เราไม่มีสิทธิ์เข้าถึงหรือลบข้อมูลส่วนนั้นให้จากระยะไกล
+        </div>
+      </section>
+
+      <section>
+        <h2>ข้อมูลที่ยังถูกเก็บไว้ และเก็บนานเท่าไร</h2>
+        <p>ข้อมูลบางส่วนต้องเก็บต่อตามข้อกำหนดทางกฎหมายหรือทางเทคนิค</p>
+        <table>
+          <thead>
+            <tr><th>ข้อมูล</th><th>ระยะเวลา</th><th>เหตุผล</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>บันทึกการชำระเงินและการสมัครสมาชิก</td>
+              <td>สูงสุด 5 ปี</td>
+              <td>ข้อกำหนดด้านบัญชีและภาษี จัดการโดย Google Play และ RevenueCat</td>
+            </tr>
+            <tr>
+              <td>สำเนาสำรองของฐานข้อมูล</td>
+              <td>สูงสุด 30 วัน</td>
+              <td>รอบการหมุนเวียน backup ของ Supabase สำเนาจะถูกเขียนทับโดยอัตโนมัติ</td>
+            </tr>
+            <tr>
+              <td>รายงานข้อผิดพลาดที่ไม่ระบุตัวตน</td>
+              <td>สูงสุด 90 วัน</td>
+              <td>ใช้แก้บั๊ก ไม่มีข้อมูลการเงินและเชื่อมโยงกลับมาหาคุณไม่ได้</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="callout warn">
+          <strong>สิ่งที่การลบบัญชีไม่ครอบคลุม:</strong> การลบบัญชีไม่ได้ยกเลิกการสมัครสมาชิกที่ยังใช้งานอยู่
+          และไม่ใช่การขอคืนเงิน หากคุณสมัคร MoneyMa Premium ไว้
+          กรุณายกเลิกที่ <strong>Google Play → การสมัครใช้บริการ</strong> ก่อนส่งคำขอลบบัญชี
+        </div>
+      </section>
+
+      <section>
+        <h2>ต้องการลบเฉพาะข้อมูลบางส่วน</h2>
+        <p>ถ้ายังไม่อยากปิดบัญชีทั้งหมด คุณเลือกทำอย่างใดอย่างหนึ่งได้</p>
+        <ul>
+          <li><strong>ลบรายการทีละรายการ</strong> — ทำได้เองในแอปที่หน้ารายการรายรับรายจ่าย</li>
+          <li><strong>ลบข้อมูลบนคลาวด์แต่เก็บบัญชีไว้</strong> — ส่งอีเมลมาแจ้ง ระบุว่าต้องการลบเฉพาะข้อมูลที่ซิงก์</li>
+          <li><strong>ปิดการซิงก์</strong> — ตั้งค่าในแอปเพื่อให้ข้อมูลใหม่เก็บอยู่บนอุปกรณ์อย่างเดียว</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>ติดต่อ</h2>
+        <p>คำถามเกี่ยวกับการลบบัญชีหรือความเป็นส่วนตัว ส่งมาที่ <code>naiguitarfolk@gmail.com</code></p>
+        <p>ดูรายละเอียดเพิ่มเติมได้ที่ <a href="privacy-policy.html">นโยบายความเป็นส่วนตัว</a></p>
+      </section>
+
+    </div>
+  </div>
+
+  <!-- ─── ENGLISH ──────────────────────────────────────────────── -->
+  <div id="lang-en" class="lang-content">
+    <div class="content">
+
+      <section>
+        <h2>How to request deletion</h2>
+        <p>You can delete your MoneyMa account and its associated data in either of two ways. Both have the same result.</p>
+
+        <h3>Option 1 — Delete from inside the app</h3>
+        <ol>
+          <li>Open MoneyMa and sign in</li>
+          <li>Go to <strong>Settings</strong></li>
+          <li>Under <strong>Account</strong>, choose <strong>Delete account</strong></li>
+          <li>Confirm when prompted</li>
+        </ol>
+
+        <h3>Option 2 — Request by email</h3>
+        <p>If you have already uninstalled the app or cannot sign in, send a request to the address below.</p>
+        <p>
+          <a class="cta" href="mailto:naiguitarfolk@gmail.com?subject=MoneyMa%20account%20deletion%20request&body=Registered%20email%3A%20%0A%0AI%20request%20deletion%20of%20my%20MoneyMa%20account%20and%20all%20associated%20data.">
+            Send a deletion request
+          </a>
+        </p>
+        <p>Or email <code>naiguitarfolk@gmail.com</code> directly and include:</p>
+        <ul>
+          <li>Subject: <strong>MoneyMa account deletion request</strong></li>
+          <li>The <strong>email address registered in the app</strong> — send from that address so we can verify it is you</li>
+        </ul>
+        <div class="callout">
+          We verify your identity and complete the deletion within <strong>30 days</strong> of receiving the request,
+          and confirm by email once it is done.
+        </div>
+      </section>
+
+      <section>
+        <h2>What gets deleted</h2>
+        <p>Once your request is processed, the following is permanently removed from our systems:</p>
+        <ul>
+          <li>Your account and authentication details (email address, user ID)</li>
+          <li>All income and expense records synced to the cloud</li>
+          <li>Categories, budgets, and custom settings</li>
+          <li>Data extracted from scanned slips and stored on your account</li>
+          <li>App preferences such as language and theme stored on your account</li>
+        </ul>
+        <div class="callout">
+          Data held <strong>only on your device</strong> is removed when you uninstall the app.
+          We have no access to that data and cannot delete it remotely.
+        </div>
+      </section>
+
+      <section>
+        <h2>What is retained, and for how long</h2>
+        <p>Some records must be kept for legal or technical reasons.</p>
+        <table>
+          <thead>
+            <tr><th>Data</th><th>Retention</th><th>Reason</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Payment and subscription records</td>
+              <td>Up to 5 years</td>
+              <td>Accounting and tax obligations, handled by Google Play and RevenueCat</td>
+            </tr>
+            <tr>
+              <td>Database backup copies</td>
+              <td>Up to 30 days</td>
+              <td>Supabase backup rotation window; copies are overwritten automatically</td>
+            </tr>
+            <tr>
+              <td>Anonymized crash reports</td>
+              <td>Up to 90 days</td>
+              <td>Used for debugging; contain no financial data and cannot be traced back to you</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="callout warn">
+          <strong>What deletion does not cover:</strong> deleting your account does not cancel an active
+          subscription and is not a refund request. If you subscribe to MoneyMa Premium, cancel it under
+          <strong>Google Play → Subscriptions</strong> before requesting deletion.
+        </div>
+      </section>
+
+      <section>
+        <h2>If you only want to delete some data</h2>
+        <p>If you would rather keep your account, you have these options:</p>
+        <ul>
+          <li><strong>Delete individual entries</strong> — do this yourself on the transactions screen</li>
+          <li><strong>Delete cloud data but keep the account</strong> — email us and say you want only synced data removed</li>
+          <li><strong>Turn off sync</strong> — change this in Settings so new data stays on your device only</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Contact</h2>
+        <p>Questions about deletion or privacy: <code>naiguitarfolk@gmail.com</code></p>
+        <p>See also our <a href="privacy-policy.html">Privacy Policy</a></p>
+      </section>
+
+    </div>
+  </div>
+
+  <footer>
+    MoneyMa · com.moneyma.app · <a href="privacy-policy.html">Privacy Policy</a>
+  </footer>
+
+</main>
+
+<script>
+  function setLang(lang) {
+    document.querySelectorAll('.lang-content').forEach(function (el) { el.classList.remove('active'); });
+    document.getElementById('lang-' + lang).classList.add('active');
+    document.querySelectorAll('.lang-btn').forEach(function (btn) { btn.classList.remove('active'); });
+    event.currentTarget.classList.add('active');
+    document.documentElement.lang = lang;
+  }
+  // เปิดหน้าเป็นภาษาอังกฤษอัตโนมัติถ้าเบราว์เซอร์ไม่ได้ตั้งเป็นภาษาไทย
+  if (!(navigator.language || '').toLowerCase().startsWith('th')) {
+    document.querySelectorAll('.lang-content').forEach(function (el) { el.classList.remove('active'); });
+    document.getElementById('lang-en').classList.add('active');
+    var btns = document.querySelectorAll('.lang-btn');
+    btns[0].classList.remove('active');
+    btns[1].classList.add('active');
+    document.documentElement.lang = 'en';
+  }
+</script>
+</body>
+</html>

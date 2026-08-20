@@ -1,0 +1,83 @@
+/* แถบโปรโมชัน — ใช้ตัวแปรจาก App.css ทั้งหมด ไม่ hardcode สี */
+
+.promo-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  margin-bottom: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-success-soft);
+  color: var(--color-text-primary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.promo-banner:hover { background: var(--color-info-soft); }
+.promo-banner:active { transform: scale(0.995); }
+
+.promo-banner:focus-visible {
+  outline: 2px solid var(--color-info);
+  outline-offset: 2px;
+}
+
+.promo-banner__badge {
+  flex: 0 0 auto;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-xs);
+  background: var(--color-success);
+  color: #06251a;
+  font-size: var(--text-sm, 13px);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.promo-banner__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.promo-banner__text strong {
+  font-size: var(--text-sm, 13px);
+  font-weight: 600;
+  line-height: 1.35;
+  /* ภาษาไทยไม่มีช่องว่างระหว่างคำ ถ้าไม่บังคับจะล้นกรอบบนจอแคบ */
+  overflow-wrap: anywhere;
+}
+
+.promo-banner__days {
+  font-size: var(--text-xs, 11px);
+  color: var(--color-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.promo-banner__cta {
+  flex: 0 0 auto;
+  font-size: 20px;
+  line-height: 1;
+  color: var(--color-text-muted);
+}
+
+/* 7 วันสุดท้าย — เปลี่ยนเป็นโทนเตือน ไม่ใช่โทนชวน */
+.promo-banner--urgent {
+  background: var(--color-warning-soft);
+  border-color: var(--color-warning);
+}
+.promo-banner--urgent:hover { background: var(--color-warning-soft); }
+.promo-banner--urgent .promo-banner__badge {
+  background: var(--color-warning);
+  color: #2a1c00;
+}
+
+/* เคารพผู้ใช้ที่ปิดแอนิเมชัน */
+@media (prefers-reduced-motion: reduce) {
+  .promo-banner { transition: none; }
+  .promo-banner:active { transform: none; }
+}

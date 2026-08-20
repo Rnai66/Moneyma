@@ -155,7 +155,7 @@ Depending on the features available in your version of MoneyMa, you may be able 
 
 Support contact for deletion requests:
 
-- rnaibro@gmail.com
+- naiguitarfolk@gmail.com
 
 ## 11. Children's Privacy
 
@@ -179,4 +179,4 @@ When we do, we will revise the "Last updated" date above. If changes are materia
 
 If you have questions, privacy concerns, or deletion requests, contact:
 
-- rnaibro@gmail.com
+- naiguitarfolk@gmail.com

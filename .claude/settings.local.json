@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(xargs cat)",
+      "Bash(npm run *)",
+      "Bash(xargs ls -lh)",
+      "Bash(./gradlew assembleRelease)",
+      "Bash(./gradlew bundleRelease)",
+      "Bash(npx cap *)",
+      "Bash(./gradlew :app:dumpBadging)",
+      "Bash(python3 -c ' *)"
+    ]
+  }
+}

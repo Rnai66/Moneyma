@@ -1,0 +1,347 @@
+.ecm-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(15, 23, 42, 0.7);
+  backdrop-filter: blur(8px);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.ecm-modal {
+  background: var(--bg-card, #ffffff);
+  color: var(--color-text-primary, #0f172a);
+  border-radius: 24px;
+  width: 100%;
+  max-width: 960px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--color-border, #e2e8f0);
+  overflow: hidden;
+}
+
+.ecm-header {
+  padding: 24px 28px;
+  border-bottom: 1px solid var(--color-border, #e2e8f0);
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.ecm-eyebrow {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent-primary, #6366f1);
+  display: block;
+  margin-bottom: 4px;
+}
+
+.ecm-title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.ecm-close {
+  background: var(--bg-subtle, #f1f5f9);
+  border: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-secondary, #64748b);
+  transition: all 0.2s ease;
+}
+
+.ecm-close:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+.ecm-body {
+  display: grid;
+  grid-template-columns: 1.2fr 0.8fr;
+  flex: 1;
+  overflow-y: auto;
+}
+
+@media (max-width: 768px) {
+  .ecm-body {
+    grid-template-columns: 1fr;
+  }
+}
+
+.ecm-settings-panel {
+  padding: 24px 28px;
+  border-right: 1px solid var(--color-border, #e2e8f0);
+}
+
+.ecm-section-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-text-secondary, #475569);
+  margin: 0 0 14px 0;
+  padding-bottom: 6px;
+  border-bottom: 1px dashed var(--color-border, #cbd5e1);
+}
+
+.ecm-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.ecm-field label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-secondary, #64748b);
+}
+
+.ecm-field input,
+.ecm-field select {
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--color-border, #cbd5e1);
+  background: var(--bg-input, #ffffff);
+  color: var(--color-text-primary, #0f172a);
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.2s ease;
+}
+
+.ecm-field input:focus,
+.ecm-field select:focus {
+  border-color: var(--accent-primary, #6366f1);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+.ecm-field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.ecm-format-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.ecm-format-card {
+  padding: 12px;
+  border-radius: 12px;
+  border: 1.5px solid var(--color-border, #cbd5e1);
+  background: var(--bg-subtle, #f8fafc);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ecm-format-card strong {
+  font-size: 12px;
+  color: var(--color-text-primary, #0f172a);
+}
+
+.ecm-format-card small {
+  font-size: 10px;
+  color: var(--color-text-secondary, #64748b);
+}
+
+.ecm-format-card:hover {
+  border-color: var(--accent-primary, #6366f1);
+}
+
+.ecm-format-card.active {
+  border-color: var(--accent-primary, #6366f1);
+  background: rgba(99, 102, 241, 0.08);
+}
+
+.ecm-columns-selector {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.ecm-col-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.ecm-col-checkbox input {
+  accent-color: var(--accent-primary, #6366f1);
+}
+
+.ecm-preview-panel {
+  padding: 24px 28px;
+  background: var(--bg-subtle, #f8fafc);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ecm-preview-header {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text-secondary, #475569);
+}
+
+.ecm-preview-box {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  color: #1e293b;
+  font-size: 12px;
+}
+
+.ecm-prev-company {
+  font-size: 16px;
+  font-weight: 800;
+  color: #4338ca;
+}
+
+.ecm-prev-sub {
+  font-size: 11px;
+  color: #64748b;
+}
+
+.ecm-prev-title {
+  font-size: 14px;
+  font-weight: 700;
+  margin-top: 10px;
+}
+
+.ecm-prev-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+  font-size: 11px;
+}
+
+.ecm-prev-table th {
+  background: #f1f5f9;
+  padding: 6px 8px;
+  text-align: left;
+  font-weight: 600;
+  color: #475569;
+}
+
+.ecm-prev-table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.ecm-badge {
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.ecm-badge.income {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.ecm-badge.expense {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.ecm-footer {
+  padding: 20px 28px;
+  border-top: 1px solid var(--color-border, #e2e8f0);
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  background: var(--bg-card, #ffffff);
+}
+
+.ecm-btn-secondary {
+  padding: 10px 20px;
+  border-radius: 12px;
+  border: 1px solid var(--color-border, #cbd5e1);
+  background: var(--bg-subtle, #f1f5f9);
+  color: var(--color-text-primary, #0f172a);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ecm-btn-primary {
+  padding: 10px 24px;
+  border-radius: 12px;
+  border: none;
+  background: linear-gradient(135deg, #6366f1 0%, #4338ca 100%);
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+  transition: all 0.2s ease;
+}
+
+.ecm-btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(99, 102, 241, 0.4);
+}
+
+@media (max-width: 768px) {
+  .ecm-backdrop {
+    padding: 10px;
+    z-index: 10000;
+  }
+
+  .ecm-modal {
+    max-height: 85vh;
+    border-radius: 18px;
+  }
+
+  .ecm-header {
+    padding: 16px 20px;
+  }
+
+  .ecm-title {
+    font-size: 17px;
+  }
+
+  .ecm-settings-panel {
+    padding: 16px;
+    border-right: none;
+  }
+
+  .ecm-field-row {
+    grid-template-columns: 1fr;
+  }
+
+  .ecm-format-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .ecm-footer {
+    padding: 14px 20px;
+  }
+}
