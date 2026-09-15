@@ -18,6 +18,7 @@ const db = () => supabaseService?.client || null;
 
 const QUEUE_KEY = 'moneyma_receipt_queue';
 const MERCHANT_ID_KEY = 'moneyma_merchant_id';
+const MERCHANT_NAME_KEY = 'moneyma_merchant_name';
 const QUEUE_LIMIT = 500; // กันคิวบวมกรณีร้านออฟไลน์ยาว
 
 // ── โดเมนที่ QR จะพาไป ───────────────────────────────────────────
@@ -83,6 +84,43 @@ function localMerchantId() {
   }
 }
 
+const DEFAULT_MERCHANT_NAME = 'ร้านค้า (ยังไม่ตั้งชื่อ)';
+
+/** ชื่อที่ส่งขึ้น Supabase สำเร็จล่าสุด — ใช้เทียบว่าต้องอัปเดตไหม */
+function syncedMerchantName() {
+  try {
+    return localStorage.getItem(MERCHANT_NAME_KEY) || '';
+  } catch (e) {
+    return '';
+  }
+}
+
+function rememberMerchantName(name) {
+  try { localStorage.setItem(MERCHANT_NAME_KEY, name); } catch (e) { /* ไม่เป็นไร */ }
+}
+
+/** ตัดช่องว่างซ้อนและกันชื่อยาวเกินจอของหน้า /r/ */
+function cleanShopName(name) {
+  return String(name || '').trim().replace(/\s+/g, ' ').slice(0, 80);
+}
+
+/**
+ * อัปเดตชื่อร้านอย่างเดียว
+ *
+ * จำชื่อลง localStorage เฉพาะตอนเขียนสำเร็จ — ถ้าพลาดเพราะออฟไลน์
+ * รอบหน้าจะเห็นว่าชื่อยังไม่ตรงแล้วลองใหม่เอง ไม่ใช่เงียบไปตลอด
+ */
+async function pushMerchantName(merchantId, name) {
+  const client = db();
+  if (!client) return;
+  try {
+    const { error } = await client.from('merchants').update({ name }).eq('id', merchantId);
+    if (!error) rememberMerchantName(name);
+  } catch (e) {
+    /* ออฟไลน์ ค่อยลองรอบหน้า */
+  }
+}
+
 /**
  * ผูกเครื่องนี้เข้ากับแถวใน merchants ครั้งแรกที่ออนไลน์
  *
@@ -94,8 +132,17 @@ function localMerchantId() {
  *    ถ้ายังไม่ล็อกอิน ใบเสร็จจะค้างในคิวจนกว่าจะล็อกอิน (ไม่หาย)
  */
 export async function ensureMerchant(profile = {}) {
+  const name = cleanShopName(profile.name);
   const existing = localMerchantId();
-  if (existing) return existing;
+
+  // 🔴 มีร้านแล้วก็ยังต้องเข้ามาตรงนี้ ห้าม return ทันทีแบบเวอร์ชันแรก
+  //    เวอร์ชันแรกออกตั้งแต่บรรทัดนี้ ชื่อร้านที่ตั้งทีหลังจึงไม่มีวันขึ้นถึง Supabase
+  //    ลูกค้าที่สแกน QR เห็น "ร้านค้า (ยังไม่ตั้งชื่อ)" ตลอดไปทั้งที่สลิปพิมพ์ชื่อจริง
+  if (existing) {
+    // เทียบกับชื่อที่ส่งสำเร็จล่าสุด -> ยิงเน็ตเฉพาะตอนชื่อเปลี่ยนจริง ไม่ใช่ทุกใบเสร็จ
+    if (name && name !== syncedMerchantName()) await pushMerchantName(existing, name);
+    return existing;
+  }
 
   const client = db();
   if (!client) return null;
@@ -111,7 +158,7 @@ export async function ensureMerchant(profile = {}) {
         {
           owner_user_id: userId,
           merchant_code: getMerchantCode(),
-          name: profile.name || 'ร้านค้า (ยังไม่ตั้งชื่อ)',
+          name: name || DEFAULT_MERCHANT_NAME,
           segment: profile.segment || null,
           province: profile.province || null,
           source: profile.source || 'organic',
@@ -124,6 +171,7 @@ export async function ensureMerchant(profile = {}) {
 
     if (error || !data) return null;
     try { localStorage.setItem(MERCHANT_ID_KEY, data.id); } catch (e) { /* ไม่เป็นไร */ }
+    if (name) rememberMerchantName(name);
     return data.id;
   } catch (e) {
     return null;
@@ -153,7 +201,7 @@ async function flushQueue(merchantId) {
  *
  * ห้าม await ในเส้นทางการขาย — ปล่อยให้วิ่งเบื้องหลัง
  */
-export function recordReceipt({ token, docNo, total, itemCount, issuedAt }) {
+export function recordReceipt({ token, docNo, total, itemCount, issuedAt, shopName }) {
   if (!LOOP_ENABLED || !token) return;
 
   const row = {
@@ -168,17 +216,20 @@ export function recordReceipt({ token, docNo, total, itemCount, issuedAt }) {
   writeQueue([...readQueue(), row]);
 
   (async () => {
-    const merchantId = localMerchantId() || (await ensureMerchant());
+    // เรียก ensureMerchant เสมอ ไม่ลัดด้วย localMerchantId() เหมือนเดิม
+    // เพราะขาอัปเดตชื่อร้านอยู่ข้างใน — ลัดแล้วชื่อจะไม่มีวันถูกส่ง
+    // (ข้างในคืนค่าทันทีถ้าชื่อไม่เปลี่ยน จึงไม่ได้เพิ่มการยิงเน็ต)
+    const merchantId = await ensureMerchant({ name: shopName });
     if (!merchantId) return;
     await flushQueue(merchantId);
   })();
 }
 
 /** เรียกตอนเปิดหน้า POS เพื่อเคลียร์คิวที่ค้างจากวันก่อน */
-export function syncPendingReceipts() {
+export function syncPendingReceipts(profile = {}) {
   if (!LOOP_ENABLED) return;
   (async () => {
-    const merchantId = localMerchantId() || (await ensureMerchant());
+    const merchantId = await ensureMerchant(profile);
     if (merchantId) await flushQueue(merchantId);
   })();
 }

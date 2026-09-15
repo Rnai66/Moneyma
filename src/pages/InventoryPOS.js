@@ -470,7 +470,10 @@ export default function InventoryPOS({ userPlan = 'free', onAddTransaction, open
   //     ซึ่ง iOS จะเด้งแผง AirPrint ให้เอง
   // ────────────────────────────────────────────────────────────────
   // ใบเสร็จที่ออกตอนเน็ตร้านหลุด ค้างอยู่ในเครื่อง — ส่งขึ้นตอนเปิดหน้า POS
-  useEffect(() => { syncPendingReceipts(); }, []);
+  // dep เป็น shopName ด้วย: ตั้งชื่อร้านเสร็จแล้วชื่อขึ้น Supabase เลย
+  // ไม่ต้องรอออกใบเสร็จใบถัดไป (flushQueue คืนค่าทันทีถ้าคิวว่าง)
+  useEffect(() => { syncPendingReceipts({ name: printerSettings.shopName }); },
+    [printerSettings.shopName]);
 
   const [printDoc, setPrintDoc] = useState(null);
   const saveDocAsImageRef = useRef(null);
@@ -629,6 +632,7 @@ export default function InventoryPOS({ userPlan = 'free', onAddTransaction, open
         docNo: doc.docNo,
         total: doc.total,
         itemCount: (doc.items || []).length,
+        shopName: printerSettings.shopName,
       });
     }
 
