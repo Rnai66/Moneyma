@@ -3,11 +3,13 @@ import { useAuth } from '../services/AuthContext';
 import { useLanguage } from '../services/LanguageContext';
 import '../styles/Auth.css';
 import { APP_ICON } from '../config/appInfo';
+import AppleSignInButton from '../components/AppleSignInButton';
 
 export default function Login({ onSwitchToRegister, onLoginSuccess, onContinueAsGuest }) {
   const {
     signIn,
     signInWithGoogle,
+    signInWithApple,
     resetPassword,
     enableDevBypass,
     isDevBypassEnabled,
@@ -141,7 +143,7 @@ export default function Login({ onSwitchToRegister, onLoginSuccess, onContinueAs
             {(error || authError) && (
               <div className="auth-error">
                 <span>⚠️</span>
-                <p>{error || authError?.message || 'An error occurred'}</p>
+                <p>{error || (typeof authError === 'string' ? authError : authError?.message) || 'An error occurred'}</p>
               </div>
             )}
             
@@ -189,7 +191,7 @@ export default function Login({ onSwitchToRegister, onLoginSuccess, onContinueAs
           {(error || authError) && (
             <div className="auth-error">
               <span>⚠️</span>
-              <p>{error || authError?.message || 'An error occurred'}</p>
+              <p>{error || (typeof authError === 'string' ? authError : authError?.message) || 'An error occurred'}</p>
             </div>
           )}
 
@@ -235,8 +237,14 @@ export default function Login({ onSwitchToRegister, onLoginSuccess, onContinueAs
             </button>
 
             <div className="auth-divider">
-              <span>{language === 'th' ? 'หรือเข้าสู่ระบบด้วย' : 'or continue with'}</span>
+              <span>{t.orContinueWith || (language === 'th' ? 'หรือเข้าสู่ระบบด้วย' : 'or continue with')}</span>
             </div>
+            <AppleSignInButton
+              onClick={signInWithApple}
+              disabled={isSubmitting || isLoading}
+              language={language}
+              mode="signIn"
+            />
 
             <button
               type="button"
@@ -245,7 +253,7 @@ export default function Login({ onSwitchToRegister, onLoginSuccess, onContinueAs
               disabled={isSubmitting || isLoading}
             >
               <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" />
-              {language === 'th' ? 'เข้าสู่ระบบด้วย Google' : 'Sign in with Google'}
+              {t.signInWithGoogle || (language === 'th' ? 'เข้าสู่ระบบด้วย Google' : 'Sign in with Google')}
             </button>
           </form>
         )}

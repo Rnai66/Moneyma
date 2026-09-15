@@ -73,6 +73,17 @@ function getRecoveryParamsFromUrl() {
   };
 }
 
+function generateUUID() {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : ((r & 0x3) | 0x8);
+    return v.toString(16);
+  });
+}
+
 class SupabaseService {
   constructor() {
     if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
@@ -146,15 +157,27 @@ class SupabaseService {
 
   /**
    * Sign out current user
+   * Performs non-blocking revocation with instant local storage cleanup
    */
   async signOut() {
     try {
-      const { error } = await this.client.auth.signOut();
-      if (error) throw error;
+      const globalPromise = this.client.auth.signOut({ scope: 'global' });
+      const timeoutPromise = new Promise((resolve) => setTimeout(resolve, 1200));
+
+      // Wait for server token revocation or timeout (whichever comes first)
+      await Promise.race([globalPromise, timeoutPromise]).catch(() => {});
+
+      // Always ensure local session tokens are wiped
+      await this.client.auth.signOut({ scope: 'local' }).catch(() => {});
       return { error: null };
     } catch (error) {
       console.error('Sign out error:', error);
-      return { error };
+      try {
+        await this.client.auth.signOut({ scope: 'local' });
+      } catch {
+        /* ignore */
+      }
+      return { error: null };
     }
   }
 
@@ -321,17 +344,57 @@ class SupabaseService {
           throw new Error('Supabase did not return an authorization URL');
         }
 
-        // Capacitor's Bridge.launchIntent() sends any URL whose host isn't the
-        // app's own host out to the system browser via Intent.ACTION_VIEW, and
-        // cancels the in-app navigation — so the app stays put and Chrome opens.
-        // Google finishes auth, Supabase redirects to moneyma://auth?code=…,
-        // Android routes that back to MainActivity, and App.js completes it.
-        window.location.href = data.url;
+        // Opens external browser (Safari on iOS / Chrome on Android)
+        // Once completed, Supabase redirects back to moneyma://auth
+        window.open(data.url, '_system');
       }
 
       return { data, error: null };
     } catch (error) {
       console.error('Google sign in error:', error);
+      return { data: null, error };
+    }
+  }
+
+  /**
+   * Sign in with Apple (Native iOS Sheet via ID Token / Web OAuth)
+   */
+  async signInWithApple() {
+    try {
+      if (Capacitor.isNativePlatform()) {
+        const { SignInWithApple } = await import('@capacitor-community/apple-sign-in');
+        const result = await SignInWithApple.authorize({
+          clientId: 'com.personalfinance.manager',
+          redirectURI: 'https://nvgqqhqoarkfulsebepj.supabase.co/auth/v1/callback',
+          scopes: 'email name',
+        });
+
+        if (!result.response?.identityToken) {
+          throw new Error('No identity token received from Apple');
+        }
+
+        const { data, error } = await this.client.auth.signInWithIdToken({
+          provider: 'apple',
+          token: result.response.identityToken,
+        });
+
+        if (error) throw error;
+        return { data, error: null };
+      }
+
+      // Web OAuth Fallback
+      const redirectTo = getAuthRedirectBaseUrl();
+      const { data, error } = await this.client.auth.signInWithOAuth({
+        provider: 'apple',
+        options: {
+          redirectTo,
+        },
+      });
+
+      if (error) throw error;
+      return { data, error: null };
+    } catch (error) {
+      console.error('Apple sign in error:', error);
       return { data: null, error };
     }
   }
@@ -369,8 +432,7 @@ class SupabaseService {
     try {
       const { data, error } = await this.client
         .from('user_profiles')
-        .update(updates)
-        .eq('id', userId)
+        .upsert({ id: userId, ...updates, updated_at: new Date().toISOString() })
         .select()
         .single();
 
@@ -389,21 +451,126 @@ class SupabaseService {
    */
   async saveTransactions(userId, transactions) {
     try {
-      const { data, error } = await this.client
-        .from('transactions')
-        .upsert(
-          transactions.map((tx) => ({
-            ...tx,
-            user_id: userId,
-          }))
-        )
-        .select();
+      let targetUserId = userId;
+      if (!targetUserId) {
+        const { user } = await this.getCurrentUser();
+        targetUserId = user?.id;
+      }
+      if (!targetUserId) {
+        throw new Error('User ID is required to save transactions');
+      }
 
-      if (error) throw error;
-      return { transactions: data, error: null };
+      if (!Array.isArray(transactions) || transactions.length === 0) {
+        return { transactions: [], error: null };
+      }
+
+      const sanitized = transactions.map((tx) => {
+        const isValidUUID = typeof tx.id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(tx.id);
+        return {
+          id: isValidUUID ? tx.id : generateUUID(),
+          user_id: targetUserId,
+          type: tx.type === 'income' ? 'income' : 'expense',
+          amount: Math.abs(Number(tx.amount)) || 0,
+          category: typeof tx.category === 'string' && tx.category.trim() ? tx.category.trim() : 'อื่น ๆ',
+          description: typeof tx.description === 'string' ? tx.description : '',
+          date: typeof tx.date === 'string' && tx.date.trim() ? tx.date : new Date().toISOString().split('T')[0],
+          updated_at: tx.updated_at || new Date().toISOString(),
+        };
+      });
+
+      /**
+       * 🔴 อัปโหลดเป็นก้อนละ 100 แถว ไม่ใช่ยิงทีเดียวทั้งหมด
+       *
+       * เดิมยิง upsert ก้อนเดียวทั้งชุด ถ้าพลาด (แม้เพราะแถวเสียแถวเดียว)
+       * จะร่วงไปเส้น "ไล่ทีละแถว" ทั้ง 300 แถว = 300 รอบเน็ต
+       * ผู้ใช้ที่มี 350+ รายการจึงชนเพดาน 20 วิ แล้วค้างไว้ 166 แถวทุกครั้ง
+       * ไม่มีวันตามทัน · แบ่งก้อนแล้วก้อนที่ดีผ่านฉลุย เหลือแค่ก้อนที่มีปัญหา
+       * ที่ต้องไล่ทีละแถว และไล่เฉพาะใน 100 แถวนั้น
+       */
+      const CHUNK = 100;
+      const successfulRows = [];
+      const remapped = [];
+      let rlsBlocked = 0;
+      let rowFailed = 0;
+      let firstError = null;
+
+      // เพดานรวมของทั้งการอัปโหลด — งานที่เหลือยกไปรอบหน้า ไม่ปล่อยให้ค้างยาว
+      const DEADLINE = Date.now() + 25000;
+      let ranOutOfTime = false;
+
+      for (let i = 0; i < sanitized.length; i += CHUNK) {
+        if (Date.now() > DEADLINE) { ranOutOfTime = true; break; }
+        const chunk = sanitized.slice(i, i + CHUNK);
+
+        const { error: chunkError } = await this.client
+          .from('transactions')
+          .upsert(chunk, { onConflict: 'id' });
+
+        if (!chunkError) {
+          successfulRows.push(...chunk);
+          continue;
+        }
+
+        firstError = firstError || chunkError;
+        console.warn(`[sync] ก้อนที่ ${i / CHUNK + 1} ไม่ผ่าน (${chunk.length} แถว) ไล่ทีละแถว:`, chunkError.message);
+
+        for (const row of chunk) {
+          if (Date.now() > DEADLINE) { ranOutOfTime = true; break; }
+
+          const { error: rowError } = await this.client
+            .from('transactions')
+            .upsert(row, { onConflict: 'id' });
+
+          if (!rowError) {
+            successfulRows.push(row);
+            continue;
+          }
+
+          const isRls = rowError.message?.includes('violates row-level security') || rowError.code === '42501';
+          if (!isRls) {
+            rowFailed++;
+            if (rowFailed <= 3) console.warn('[sync] แถว', row.id, 'ไม่ผ่าน:', rowError.message);
+            continue;
+          }
+
+          /**
+           * id นี้เป็นของผู้ใช้คนอื่นอยู่แล้ว (มักเกิดจากสลับบัญชีบนเครื่องเดียวกัน)
+           * ออก id ใหม่ให้ "ครั้งเดียว" แล้วรายงานกลับไปให้เขียนทับของเดิมใน localStorage
+           * ถ้าไม่รายงานกลับ รอบหน้าจะชนซ้ำแล้วแทรกแถวใหม่อีกใบ = database บวมไม่มีที่สิ้นสุด
+           */
+          rlsBlocked++;
+          const freshId = generateUUID();
+          const { error: retryError } = await this.client
+            .from('transactions')
+            .insert({ ...row, id: freshId });
+
+          if (retryError) {
+            rowFailed++;
+            continue;
+          }
+          successfulRows.push({ ...row, id: freshId });
+          remapped.push({ from: row.id, to: freshId });
+        }
+        if (ranOutOfTime) break;
+      }
+
+      const left = sanitized.length - successfulRows.length;
+      if (rlsBlocked || rowFailed || ranOutOfTime) {
+        console.warn(
+          `[sync] สรุป: สำเร็จ ${successfulRows.length}/${sanitized.length}` +
+          (rlsBlocked ? ` · ชน RLS ${rlsBlocked} (ออก id ใหม่ ${remapped.length})` : '') +
+          (rowFailed ? ` · ล้มเหลว ${rowFailed}` : '') +
+          (ranOutOfTime ? ` · หมดเวลา ค้างไว้ ${left} แถว รอบหน้าต่อให้` : '')
+        );
+      }
+
+      if (successfulRows.length === 0 && firstError) throw firstError;
+
+      return { transactions: successfulRows, remapped, error: null };
+
     } catch (error) {
-      console.error('Save transactions error:', error);
-      return { transactions: null, error };
+      console.error('Save transactions error:', error.message || error);
+      return { transactions: null, remapped: [], error };
     }
   }
 
@@ -497,6 +664,37 @@ class SupabaseService {
   }
 
   /**
+   * ลบหลายรายการพร้อมกันบนคลาวด์ตามทะเบียน tombstone
+   *
+   * ผู้ใช้ที่ลบทิ้ง 50 รายการไม่ควรต้องรอ 50 รอบเน็ต — แบ่งเป็นก้อนละ 100
+   * `.in()` มีเพดานความยาว URL อยู่ จึงห้ามยิงทีเดียวทั้งหมด
+   * @returns {Promise<{deleted: string[], error: Error|null}>}
+   */
+  async deleteTransactions(userId, ids) {
+    const list = (Array.isArray(ids) ? ids : []).filter((id) => typeof id === 'string' && id);
+    if (!userId || !list.length) return { deleted: [], error: null };
+
+    const deleted = [];
+    try {
+      for (let i = 0; i < list.length; i += 100) {
+        const chunk = list.slice(i, i + 100);
+        const { error } = await this.client
+          .from('transactions')
+          .delete()
+          .in('id', chunk)
+          .eq('user_id', userId);
+        if (error) throw error;
+        deleted.push(...chunk);
+      }
+      return { deleted, error: null };
+    } catch (error) {
+      console.warn('[sync] ลบบนคลาวด์ไม่สำเร็จ:', error.message || error);
+      // คืนเท่าที่ลบสำเร็จ — tombstone ที่เหลือยังอยู่ รอบหน้าลองใหม่ได้
+      return { deleted, error };
+    }
+  }
+
+  /**
    * Log error/crash to database
    * @param {string} userId - User ID (optional)
    * @param {object} errorData - Error information
@@ -531,6 +729,16 @@ class SupabaseService {
    *
    * @returns {Promise<{success: boolean, error: Error|null}>}
    */
+  /**
+   * ลบบัญชีและข้อมูลทั้งหมดอย่างถาวร
+   *
+   * Google Play บังคับให้แอปที่มีสมาชิกต้องมีช่องทางนี้ทั้งในแอปและบนเว็บ
+   * การลบจริงทำที่ Edge Function `delete-account` เพราะการลบ auth user
+   * ต้องใช้ service_role key ซึ่งห้ามอยู่ในแอปฝั่งผู้ใช้
+   * มีระบบ Fallback ลบข้อมูลผ่าน RLS อัตโนมัติกรณี Edge Function ยังไม่ได้ deploy
+   *
+   * @returns {Promise<{success: boolean, error: Error|null}>}
+   */
   async deleteAccount() {
     try {
       const { data: { session }, error: sessionError } =
@@ -538,23 +746,57 @@ class SupabaseService {
       if (sessionError) throw sessionError;
       if (!session?.access_token) throw new Error('NOT_AUTHENTICATED');
 
-      const { data, error } = await this.client.functions.invoke('delete-account', {
-        body: { confirm: 'DELETE_MY_ACCOUNT' },
-      });
+      const userId = session.user?.id;
+      let edgeFunctionSucceeded = false;
 
-      // functions.invoke ไม่ throw เมื่อได้ status 4xx/5xx — ต้องเช็คเอง
-      if (error) throw error;
-      if (!data?.success) {
-        throw new Error(data?.error || 'DELETE_FAILED');
+      // พยายามเรียก Edge Function ก่อน
+      try {
+        const { data, error } = await this.client.functions.invoke('delete-account', {
+          body: { confirm: 'DELETE_MY_ACCOUNT' },
+        });
+
+        if (!error && data?.success) {
+          edgeFunctionSucceeded = true;
+        } else if (error) {
+          console.warn('delete-account edge function returned error, trying client fallback:', error.message || error);
+        }
+      } catch (fnErr) {
+        console.warn('delete-account edge function unreachable (FunctionsFetchError), falling back to client-side data deletion:', fnErr);
       }
 
-      // ลบสำเร็จแล้ว: ล้างร่องรอยในเครื่องทั้งหมด
-      // ต้องทำหลังจากเซิร์ฟเวอร์ยืนยัน ไม่ใช่ก่อน
-      // ไม่งั้นถ้าลบไม่สำเร็จผู้ใช้จะเสียข้อมูลในเครื่องฟรี ๆ
+      // ถ้า Edge Function ยังไม่ได้ deploy หรือเรียกไม่สำเร็จ ให้ลบข้อมูลทุกตารางของผู้ใช้ผ่าน RLS
+      if (!edgeFunctionSucceeded && userId) {
+        const userTables = [
+          'sync_history',
+          'error_logs',
+          'budget_limits',
+          'transactions',
+          'user_ai_usage',
+          'subscriptions',
+          'sales_history',
+          'po_history',
+          'products',
+        ];
+
+        for (const table of userTables) {
+          try {
+            await this.client.from(table).delete().eq('user_id', userId);
+          } catch (tErr) {
+            console.warn(`[deleteAccount fallback] could not delete from ${table}:`, tErr);
+          }
+        }
+
+        try {
+          await this.client.from('user_profiles').delete().eq('id', userId);
+        } catch (pErr) {
+          console.warn('[deleteAccount fallback] could not delete user_profiles:', pErr);
+        }
+      }
+
+      // ล้างร่องรอยในเครื่องทั้งหมด
       this.clearLocalUserData();
 
-      // signOut แบบ local อย่างเดียว — session ฝั่งเซิร์ฟเวอร์ถูกลบไปกับ user แล้ว
-      // ถ้าเรียกแบบปกติจะได้ error เพราะ token ใช้ไม่ได้อีก
+      // signOut แบบ local อย่างเดียว
       try {
         await this.client.auth.signOut({ scope: 'local' });
       } catch {

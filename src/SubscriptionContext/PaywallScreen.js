@@ -3,10 +3,12 @@ import {
   PLANS,
   purchasePlan,
   getRevenueCatOfferings,
-  openStripePortal,
+  openNativeSubscriptionManagement,
   restoreRevenueCat,
   findPackage,
   storePriceFor,
+  PREPARE_TIMEOUT_MS,
+  STORE_SHEET_TIMEOUT_MS,
 } from './SubscriptionService';
 import { Capacitor } from '@capacitor/core';
 import { useSubscription } from './SubscriptionContext';
@@ -42,11 +44,13 @@ const comparisonRows = (t) => [
  * ตอนนี้การ์ดคือ "ข้อเสนอ" ตรง ๆ — เหลือคำถามเดียวที่ตอบง่าย:
  * จ่ายรายเดือน จ่ายทีเดียวทั้งปี หรือจ่ายครั้งเดียวจบ
  */
+const IS_IOS_DEVICE = Capacitor.getPlatform() === 'ios';
+
 const OFFERS = [
   { id: 'pro_monthly',       plan: 'pro',      period: 'monthly'  },
   { id: 'pro_yearly',        plan: 'pro',      period: 'yearly', featured: true },
   { id: 'lifetime_lifetime', plan: 'lifetime', period: 'lifetime', oneTime: true },
-];
+].filter(offer => !(IS_IOS_DEVICE && offer.oneTime));
 
 // ─── Platform helper ─────────────────────────────────────────────────────────
 function isMobile() {
@@ -81,51 +85,74 @@ export default function PaywallScreen({ onClose, highlightFeature }) {
 
   // ── Purchase handler ──────────────────────────────────────────────────────
   const handlePurchase = useCallback(async (planId, period) => {
-    if (planId === 'free' || planId === currentPlan) return;
+    if (planId === 'free' || planId === currentPlan || loading) return;
     setError(null);
-    setLoadingPlan(planId + '_' + period);
+    const planKey = planId + '_' + period;
+    setLoadingPlan(planKey);
     setLoading(true);
 
+    /**
+     * ตาข่ายกันค้างชั้นสุดท้าย — ต้องยาวกว่าเพดานทุกชั้นใน SubscriptionService
+     * 🔴 ห้ามกลับไปตั้ง 28 วิ: แผ่นจ่ายเงินของ Apple อาจค้างรอผู้ใช้พิมพ์รหัส
+     * นานกว่านั้น ตัดกลางคันแล้วผู้ใช้จะเห็น error ทั้งที่การซื้อกำลังสำเร็จ
+     */
+    const safetyTimer = setTimeout(() => {
+      setLoading(false);
+      setLoadingPlan(null);
+      setError(t.error || 'Connection timed out. Please try again.');
+    }, PREPARE_TIMEOUT_MS + STORE_SHEET_TIMEOUT_MS + 5000);
+
     try {
-      // เดิมหาแบบ rcPackages[`allslip_${planId}_${period}`] ซึ่งเป็นชื่อจากแอปอื่น
-      // จึงคืน null เสมอ แล้วไปตกที่ fallback ใน purchasePlan() ที่ยิง
-      // getOfferings() ซ้ำอีกรอบ — เพิ่มดีเลย์ตอนผู้ใช้กดซื้อพอดี
-      //
-      // findPackage() รองรับชื่อจริง ($rc_monthly / $rc_annual / $rc_lifetime)
-      // อยู่แล้ว ใช้กับแพ็กเกจที่โหลดไว้ตั้งแต่เปิดหน้าได้เลย
+      let currentPackages = rcPackages;
+      if (isMobile() && (!currentPackages || currentPackages.length === 0)) {
+        currentPackages = await getRevenueCatOfferings().catch(() => []);
+        if (currentPackages.length > 0) setRcPackages(currentPackages);
+      }
+
       const rcPkg = isMobile()
-        ? findPackage(rcPackages, planId, period)
+        ? findPackage(currentPackages, planId, period)
         : null;
 
       await purchasePlan(planId, period, rcPkg);
-      await refresh();
+      await refresh().catch(console.warn);
       onClose?.();
     } catch (err) {
-      if (err.message?.includes('cancelled') || err.message?.includes('cancel')) {
+      setLoading(false);
+      setLoadingPlan(null);
+      if (err.message?.includes('cancelled') || err.message?.includes('cancel') || err.userCancelled) {
         // user cancelled — not an error
       } else {
         setError(err.message || t.error);
       }
     } finally {
+      clearTimeout(safetyTimer);
       setLoading(false);
       setLoadingPlan(null);
     }
-  }, [currentPlan, rcPackages, refresh, onClose, t]);
+  }, [currentPlan, loading, rcPackages, refresh, onClose, t]);
 
   // ── Restore purchases (mobile) ────────────────────────────────────────────
   const handleRestore = useCallback(async () => {
+    if (restoring) return;
     setRestoring(true);
     setError(null);
+    const restoreTimer = setTimeout(() => {
+      setRestoring(false);
+      setError(t.pwNoPurchase || 'Restore timed out. Please try again.');
+    }, 22000);
+
     try {
       const { plan } = await restoreRevenueCat();
-      await refresh();
+      await refresh().catch(console.warn);
       if (plan !== 'free') onClose?.();
+      else setError(t.pwNoPurchase);
     } catch (err) {
       setError(err.message || t.pwNoPurchase);
     } finally {
+      clearTimeout(restoreTimer);
       setRestoring(false);
     }
-  }, [refresh, onClose, t]);
+  }, [restoring, refresh, onClose, t]);
 
 
   // ── ป้ายบนปุ่มของแต่ละข้อเสนอ ─────────────────────────────────────────────
@@ -269,14 +296,41 @@ export default function PaywallScreen({ onClose, highlightFeature }) {
               {restoring ? t.pwRestoring : t.pwRestore}
             </button>
           )}
-          {!isMobile() && currentPlan !== 'free' && (
-            <button className="pw__footer-link" onClick={openStripePortal}>
+          {currentPlan !== 'free' && (
+            <button className="pw__footer-link" onClick={openNativeSubscriptionManagement}>
               {t.pwManageSub}
             </button>
           )}
           <p className="pw__footer-legal">
             {t.pwPaymentNote.replace('{store}', isMobile() ? 'App Store / Google Play' : 'Stripe')}
           </p>
+          <div style={{ display: 'flex', justifyContent: 'center', gap: '12px', fontSize: '11px', marginTop: '6px' }}>
+            <a 
+              href="https://moneyma-app.netlify.app/terms-of-service.html" 
+              target="_system" 
+              rel="noopener noreferrer" 
+              onClick={(e) => {
+                e.preventDefault();
+                window.open('https://moneyma-app.netlify.app/terms-of-service.html', '_system');
+              }}
+              style={{ color: 'var(--accent-primary)', textDecoration: 'underline', cursor: 'pointer' }}
+            >
+              Terms of Service (EULA)
+            </a>
+            <span>•</span>
+            <a 
+              href="https://moneyma-app.netlify.app/privacy-policy.html" 
+              target="_system" 
+              rel="noopener noreferrer" 
+              onClick={(e) => {
+                e.preventDefault();
+                window.open('https://moneyma-app.netlify.app/privacy-policy.html', '_system');
+              }}
+              style={{ color: 'var(--accent-primary)', textDecoration: 'underline', cursor: 'pointer' }}
+            >
+              Privacy Policy
+            </a>
+          </div>
         </div>
       </div>
     </div>

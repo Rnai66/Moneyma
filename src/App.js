@@ -52,19 +52,6 @@ function getDeepLinkPath(url) {
   }
 }
 
-function normalizeTransaction(tx, index = 0) {
-  const fallbackDate = new Date().toISOString().split('T')[0];
-  return {
-    ...tx,
-    id: tx?.id ?? Date.now() + index,
-    type: tx?.type === 'income' ? 'income' : 'expense',
-    amount: Number(tx?.amount) || 0,
-    category: typeof tx?.category === 'string' && tx.category.trim() ? tx.category : 'อื่น ๆ',
-    description: typeof tx?.description === 'string' ? tx.description : '',
-    date: typeof tx?.date === 'string' && tx.date.trim() ? tx.date : fallbackDate,
-  };
-}
-
 function generateUUID() {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
     return crypto.randomUUID();
@@ -74,6 +61,27 @@ function generateUUID() {
     const v = c === 'x' ? r : ((r & 0x3) | 0x8);
     return v.toString(16);
   });
+}
+
+function normalizeTransaction(tx) {
+  const fallbackDate = new Date().toISOString().split('T')[0];
+  const isValidUUID = typeof tx?.id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(tx?.id);
+  
+  let cleanDate = fallbackDate;
+  if (typeof tx?.date === 'string' && tx.date.trim()) {
+    cleanDate = tx.date.trim().slice(0, 10);
+  }
+
+  return {
+    ...tx,
+    id: isValidUUID ? tx.id : generateUUID(),
+    type: tx?.type === 'income' ? 'income' : 'expense',
+    amount: Math.abs(Number(tx?.amount)) || 0,
+    category: typeof tx?.category === 'string' && tx.category.trim() ? tx.category : 'อื่น ๆ',
+    description: typeof tx?.description === 'string' ? tx.description : '',
+    date: cleanDate,
+    updated_at: tx?.updated_at || new Date().toISOString(),
+  };
 }
 
 function getWebTransactions() {
@@ -125,7 +133,7 @@ function MainApp({ onRequireLogin, initialPage, subStatus }) {
   const [currentPage, setCurrentPage] = useState(initialPage || 'dashboard');
 
   const { isPro, isAuthenticated, user, signOut } = useAuth();
-  const { manualSync, syncStatus, isSyncing } = useSync();
+  const { manualSync, syncToCloud, syncStatus, isSyncing } = useSync();
   // Track which account we last synced for, so logging out and back in
   // (or switching accounts) triggers a fresh sync instead of being skipped.
   const [syncedUserId, setSyncedUserId] = useState(null);
@@ -248,11 +256,20 @@ function MainApp({ onRequireLogin, initialPage, subStatus }) {
     return () => window.removeEventListener('beforeunload', flush);
   }, [isAuthenticated, user?.id]);
 
-  /** Sync everything up before signing out so nothing is stranded locally. */
+  /** Quick sync push before signing out so recent changes are not stranded, with strict timeout */
   const handleSignOut = async () => {
     try {
-      if (isAuthenticated && navigator.onLine) {
-        await runSync().catch(err => console.error('Sync before sign-out failed', err));
+      if (isAuthenticated && navigator.onLine && user?.id) {
+        const quickPush = async () => {
+          const items = getWebTransactions();
+          if (items && items.length > 0 && syncToCloud) {
+            await syncToCloud(items);
+          }
+        };
+        await Promise.race([
+          quickPush(),
+          new Promise((resolve) => setTimeout(resolve, 1500)),
+        ]).catch(err => console.warn('Push before sign-out timed out or failed:', err));
       }
     } finally {
       setSyncedUserId(null);
@@ -438,7 +455,7 @@ function MainApp({ onRequireLogin, initialPage, subStatus }) {
           className="mobile-premium-btn"
           onClick={() => setCurrentPage('premium')}
           title="Premium"
-          style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+          aria-label="Premium"
         >
           <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
         </button>

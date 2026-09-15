@@ -1,0 +1,142 @@
+{
+  "appPolicies": {
+    "eula": "https://moneyma-app.netlify.app/terms-of-service.html",
+    "policies": [
+      {
+        "locale": "th_TH",
+        "policyText": "",
+        "policyURL": "https://moneyma-app.netlify.app/privacy-policy.html"
+      },
+      {
+        "locale": "en_US",
+        "policyText": "",
+        "policyURL": "https://moneyma-app.netlify.app/privacy-policy.html"
+      }
+    ]
+  },
+  "identifier": "681057F0",
+  "nonRenewingSubscriptions": [],
+  "products": [],
+  "settings": {
+    "_applicationInternalID": "6802772939",
+    "_askToBuyEnabled": false,
+    "_billingGracePeriodEnabled": false,
+    "_billingIssuesEnabled": false,
+    "_developerTeamID": "H4X9654279",
+    "_disableDialogs": false,
+    "_failTransactionsEnabled": false,
+    "_lastSynchronizedDate": 809168554.622176,
+    "_locale": "th_TH",
+    "_renewalBillingIssuesEnabled": false,
+    "_storefront": "THA",
+    "_storeKitErrors": [],
+    "_timeRate": 0
+  },
+  "subscriptionGroups": [
+    {
+      "id": "22329028",
+      "localizations": [
+        {
+          "description": "MoneyMa Premium Access",
+          "displayName": "MoneyMa Premium",
+          "locale": "th_TH"
+        }
+      ],
+      "name": "MoneyMa Premium",
+      "subscriptions": [
+        {
+          "adHocOffers": [],
+          "codeOffers": [],
+          "displayPrice": "99",
+          "familyShareable": false,
+          "groupNumber": 1,
+          "internalID": "6804360700",
+          "introductoryOffer": null,
+          "localizations": [
+            {
+              "description": "ปลดล็อกสแกน AI และสำรองข้อมูลบนคลาวด์รายเดือน",
+              "displayName": "MoneyMa Pro รายเดือน",
+              "locale": "th_TH"
+            }
+          ],
+          "productID": "pro_monthly",
+          "recurringSubscriptionPeriod": "P1M",
+          "referenceName": "MoneyMa Pro Monthly",
+          "subscriptionGroupID": "22329028",
+          "type": "RecurringSubscription",
+          "winbackOffers": []
+        },
+        {
+          "adHocOffers": [],
+          "codeOffers": [],
+          "displayPrice": "1190",
+          "familyShareable": false,
+          "groupNumber": 2,
+          "internalID": "6804360787",
+          "introductoryOffer": null,
+          "localizations": [
+            {
+              "description": "ปลดล็อกสแกน AI และสำรองข้อมูลบนคลาวด์รายปีสุดคุ้ม",
+              "displayName": "MoneyMa Pro รายปี",
+              "locale": "th_TH"
+            }
+          ],
+          "productID": "pro_yearly",
+          "recurringSubscriptionPeriod": "P1Y",
+          "referenceName": "MoneyMa Pro Yearly",
+          "subscriptionGroupID": "22329028",
+          "type": "RecurringSubscription",
+          "winbackOffers": []
+        },
+        {
+          "adHocOffers": [],
+          "codeOffers": [],
+          "displayPrice": "499",
+          "familyShareable": false,
+          "groupNumber": 3,
+          "internalID": "6804360755",
+          "introductoryOffer": null,
+          "localizations": [
+            {
+              "description": "ระบบ POS จัดการคลังสินค้าและออกบิลรายเดือน",
+              "displayName": "MoneyMa Business รายเดือน",
+              "locale": "th_TH"
+            }
+          ],
+          "productID": "business_monthly",
+          "recurringSubscriptionPeriod": "P1M",
+          "referenceName": "MoneyMa Business Monthly",
+          "subscriptionGroupID": "22329028",
+          "type": "RecurringSubscription",
+          "winbackOffers": []
+        },
+        {
+          "adHocOffers": [],
+          "codeOffers": [],
+          "displayPrice": "5990",
+          "familyShareable": false,
+          "groupNumber": 4,
+          "internalID": "6804360581",
+          "introductoryOffer": null,
+          "localizations": [
+            {
+              "description": "ระบบ POS จัดการคลังสินค้าและออกบิลรายปีสำหรับธุรกิจ",
+              "displayName": "MoneyMa Business รายปี",
+              "locale": "th_TH"
+            }
+          ],
+          "productID": "business_yearly",
+          "recurringSubscriptionPeriod": "P1Y",
+          "referenceName": "MoneyMa Business Yearly",
+          "subscriptionGroupID": "22329028",
+          "type": "RecurringSubscription",
+          "winbackOffers": []
+        }
+      ]
+    }
+  ],
+  "version": {
+    "major": 4,
+    "minor": 0
+  }
+}

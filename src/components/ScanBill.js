@@ -9,6 +9,8 @@ import {
 } from '../services/BillScanService';
 import ScanQuotaBar from './ScanQuotaBar';
 import './ScanBill.css';
+import AIConsentService from '../services/AIConsentService';
+import AIConsentModal from './AIConsentModal';
 
 // ─── Capacitor Camera ───────────────────────────────────────────────────────
 let CapCamera = null;
@@ -42,6 +44,8 @@ const STORE_TYPE_ICONS = {
 export default function ScanBill({ onTransactionCreate, onClose, t }) {
   const [status, setStatus] = useState('idle');
   // 'idle' | 'scanning' | 'result' | 'error'
+  const [showAIConsent, setShowAIConsent] = useState(false);
+  const [pendingAction, setPendingAction] = useState(null);
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -63,6 +67,28 @@ export default function ScanBill({ onTransactionCreate, onClose, t }) {
 
   const fileInputRef = useRef(null);
   const previewRef = useRef(null);
+
+  const executeWithConsent = useCallback((action) => {
+    if (AIConsentService.hasConsent()) {
+      action();
+    } else {
+      setPendingAction(() => action);
+      setShowAIConsent(true);
+    }
+  }, []);
+
+  const handleConsentAccept = useCallback(() => {
+    setShowAIConsent(false);
+    if (pendingAction) {
+      pendingAction();
+      setPendingAction(null);
+    }
+  }, [pendingAction]);
+
+  const handleConsentDecline = useCallback(() => {
+    setShowAIConsent(false);
+    setPendingAction(null);
+  }, []);
 
   // ─── Scan file ─────────────────────────────────────────────────────────────
   const doScan = useCallback(async (file) => {
@@ -93,36 +119,39 @@ export default function ScanBill({ onTransactionCreate, onClose, t }) {
   }, [t]);
 
   // ─── Camera ────────────────────────────────────────────────────────────────
-  const handleCamera = useCallback(async () => {
-    if (CapCamera) {
-      try {
-        const photo = await CapCamera.getPhoto({
-          quality: 92, allowEditing: false,
-          resultType: 'base64', source: CameraSource.Camera,
-        });
-        // photo.base64String may be undefined if user cancelled
-        if (!photo?.base64String) return;
-        const bytes = atob(photo.base64String);
-        const arr = new Uint8Array(bytes.length);
-        for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
-        doScan(new File([new Blob([arr], { type: 'image/jpeg' })], 'bill.jpg', { type: 'image/jpeg' }));
-      } catch (e) {
-        // 'User cancelled photos app' and similar cancel messages — silently ignore
-        if (!e.message?.includes('cancelled') && !e.message?.includes('cancel')) {
-          console.error('Camera error:', e);
+  const handleCamera = useCallback(() => {
+    executeWithConsent(async () => {
+      if (CapCamera) {
+        try {
+          const photo = await CapCamera.getPhoto({
+            quality: 92, allowEditing: false,
+            resultType: 'base64', source: CameraSource.Camera,
+          });
+          // photo.base64String may be undefined if user cancelled
+          if (!photo?.base64String) return;
+          const bytes = atob(photo.base64String);
+          const arr = new Uint8Array(bytes.length);
+          for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
+          doScan(new File([new Blob([arr], { type: 'image/jpeg' })], 'bill.jpg', { type: 'image/jpeg' }));
+        } catch (e) {
+          // 'User cancelled photos app' and similar cancel messages — silently ignore
+          if (!e.message?.includes('cancelled') && !e.message?.includes('cancel')) {
+            console.error('Camera error:', e);
+          }
         }
+      } else {
+        const inp = document.createElement('input');
+        inp.type = 'file'; inp.accept = 'image/*'; inp.capture = 'environment';
+        inp.onchange = (e) => { const f = e.target.files?.[0]; if (f) doScan(f); };
+        inp.click();
       }
-    } else {
-      const inp = document.createElement('input');
-      inp.type = 'file'; inp.accept = 'image/*'; inp.capture = 'environment';
-      inp.onchange = (e) => { const f = e.target.files?.[0]; if (f) doScan(f); };
-      inp.click();
-    }
-  }, [doScan]);
+    });
+  }, [executeWithConsent, doScan]);
 
   const handleFileInput = useCallback((e) => {
-    const f = e.target.files?.[0]; if (!f) return; e.target.value = ''; doScan(f);
-  }, [doScan]);
+    const f = e.target.files?.[0]; if (!f) return; e.target.value = '';
+    executeWithConsent(() => doScan(f));
+  }, [executeWithConsent, doScan]);
 
   // ─── Item editing ──────────────────────────────────────────────────────────
   const setItemOverride = useCallback((idx, field, value) => {
@@ -261,6 +290,12 @@ export default function ScanBill({ onTransactionCreate, onClose, t }) {
           />
         )}
       </div>
+
+      <AIConsentModal
+        isOpen={showAIConsent}
+        onAccept={handleConsentAccept}
+        onDecline={handleConsentDecline}
+      />
     </div>
   );
 }

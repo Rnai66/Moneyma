@@ -489,7 +489,9 @@ export async function exportTransactionsToStatementPDF(transactions = [], option
     </html>
   `;
 
-  const printWindow = window.open('', '_blank');
+  // 🔴 บนแอปจริง WKWebView ไม่คืนหน้าต่างที่ document.write() ได้
+  //    ถ้าฝืนใช้จะเงียบ ไม่มีอะไรขึ้น -> บนมือถือให้ข้ามไปบันทึกเป็นไฟล์ HTML แล้วแชร์แทน
+  const printWindow = Capacitor.isNativePlatform() ? null : window.open('', '_blank');
   if (printWindow) {
     printWindow.document.write(htmlContent);
     printWindow.document.close();
@@ -506,7 +508,11 @@ export async function exportTransactionsToStatementPDF(transactions = [], option
 
 // ─── Inventory & POS Periodic Report Export ──────────────────────────────────
 
-export async function exportInventoryPOSReport(reportData = {}) {
+/**
+ * สร้าง HTML ของรายงานประจำงวด (ไม่บันทึก ไม่พิมพ์)
+ * แยกออกมาเพื่อให้เอาไปแสดงเป็นตัวอย่างก่อนพิมพ์/บันทึกได้
+ */
+export function buildInventoryPOSReportHtml(reportData = {}) {
   const {
     title = 'รายงานสรุปการซื้อ-ขาย และสต็อกสินค้า (Inventory & POS Report)',
     companyName = 'MoneyMa Store',
@@ -622,19 +628,14 @@ export async function exportInventoryPOSReport(reportData = {}) {
     </html>
   `;
 
-  const printWindow = window.open('', '_blank');
-  if (printWindow) {
-    printWindow.document.write(htmlContent);
-    printWindow.document.close();
-    printWindow.focus();
-    setTimeout(() => {
-      printWindow.print();
-    }, 500);
-    return { success: true, message: 'Opened print dialog' };
-  } else {
-    const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
-    return saveBlob(blob, `inventory_report_${new Date().toISOString().split('T')[0]}.html`, 'Inventory Report');
-  }
+  return htmlContent;
+}
+
+/** บันทึกรายงานเป็นไฟล์ HTML แล้วเปิดแผงแชร์ */
+export async function exportInventoryPOSReport(reportData = {}) {
+  const htmlContent = buildInventoryPOSReportHtml(reportData);
+  const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+  return saveBlob(blob, `inventory_report_${new Date().toISOString().split('T')[0]}.html`, 'Inventory Report');
 }
 
 

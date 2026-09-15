@@ -1,6 +1,8 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { useSlipScan } from '../hooks/useSlipScan';
 import './ScanSlip.css';
+import AIConsentService from '../services/AIConsentService';
+import AIConsentModal from './AIConsentModal';
 
 // ─── Capacitor Camera (graceful fallback on web) ───────────────────────────
 import { Capacitor } from '@capacitor/core';
@@ -21,6 +23,8 @@ const CATEGORY_ICONS = {
 export default function ScanSlip({ onTransactionCreate, onClose, t }) {
   const [activeTab, setActiveTab] = useState('camera');
   // 'camera' | 'gallery' | 'autoscan'
+  const [showAIConsent, setShowAIConsent] = useState(false);
+  const [pendingAction, setPendingAction] = useState(null);
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -56,68 +60,96 @@ export default function ScanSlip({ onTransactionCreate, onClose, t }) {
     }
   }, []);
 
-  // ─── Camera capture ───────────────────────────────────────────────────────
-  const handleCameraCapture = useCallback(async () => {
-    if (Capacitor.isNativePlatform()) {
-      // Capacitor (mobile)
-      try {
-        const photo = await Camera.getPhoto({
-          quality: 90,
-          allowEditing: false,
-          resultType: 'base64',
-          source: CameraSource.Camera,
-        });
-        // Convert Capacitor base64 photo to a File
-        const byteChars = atob(photo.base64String);
-        const byteArr = new Uint8Array(byteChars.length);
-        for (let i = 0; i < byteChars.length; i++) byteArr[i] = byteChars.charCodeAt(i);
-        const blob = new Blob([byteArr], { type: 'image/jpeg' });
-        const file = new File([blob], 'camera.jpg', { type: 'image/jpeg' });
-        const result = await scanSingle(file);
-        handleScanSuccess(result);
-      } catch (err) {
-        if (err.message !== 'User cancelled photos app') {
-          console.error('Camera error:', err);
-        }
-      }
+  const executeWithConsent = useCallback((action) => {
+    if (AIConsentService.hasConsent()) {
+      action();
     } else {
-      // Web fallback — trigger file input with capture
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.accept = 'image/*';
-      input.capture = 'environment';
-      input.onchange = async (e) => {
-        const file = e.target.files?.[0];
-        if (file) {
+      setPendingAction(() => action);
+      setShowAIConsent(true);
+    }
+  }, []);
+
+  const handleConsentAccept = useCallback(() => {
+    setShowAIConsent(false);
+    if (pendingAction) {
+      pendingAction();
+      setPendingAction(null);
+    }
+  }, [pendingAction]);
+
+  const handleConsentDecline = useCallback(() => {
+    setShowAIConsent(false);
+    setPendingAction(null);
+  }, []);
+
+  // ─── Camera capture ───────────────────────────────────────────────────────
+  const handleCameraCapture = useCallback(() => {
+    executeWithConsent(async () => {
+      if (Capacitor.isNativePlatform()) {
+        // Capacitor (mobile)
+        try {
+          const photo = await Camera.getPhoto({
+            quality: 90,
+            allowEditing: false,
+            resultType: 'base64',
+            source: CameraSource.Camera,
+          });
+          // Convert Capacitor base64 photo to a File
+          const byteChars = atob(photo.base64String);
+          const byteArr = new Uint8Array(byteChars.length);
+          for (let i = 0; i < byteChars.length; i++) byteArr[i] = byteChars.charCodeAt(i);
+          const blob = new Blob([byteArr], { type: 'image/jpeg' });
+          const file = new File([blob], 'camera.jpg', { type: 'image/jpeg' });
           const result = await scanSingle(file);
           handleScanSuccess(result);
+        } catch (err) {
+          if (err.message !== 'User cancelled photos app') {
+            console.error('Camera error:', err);
+          }
         }
-      };
-      input.click();
-    }
-  }, [scanSingle, handleScanSuccess]);
+      } else {
+        // Web fallback — trigger file input with capture
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/*';
+        input.capture = 'environment';
+        input.onchange = async (e) => {
+          const file = e.target.files?.[0];
+          if (file) {
+            const result = await scanSingle(file);
+            handleScanSuccess(result);
+          }
+        };
+        input.click();
+      }
+    });
+  }, [executeWithConsent, scanSingle, handleScanSuccess]);
 
   // ─── Gallery single pick ──────────────────────────────────────────────────
   const handleGalleryPick = useCallback(
-    async (e) => {
+    (e) => {
       const file = e.target.files?.[0];
       if (!file) return;
       e.target.value = '';
-      const result = await scanSingle(file);
-      handleScanSuccess(result);
+      executeWithConsent(async () => {
+        const result = await scanSingle(file);
+        handleScanSuccess(result);
+      });
     },
-    [scanSingle, handleScanSuccess]
+    [executeWithConsent, scanSingle, handleScanSuccess]
   );
 
   // ─── Auto-scan batch pick ─────────────────────────────────────────────────
   const handleAutoScanPick = useCallback(
-    async (e) => {
+    (e) => {
       const files = Array.from(e.target.files || []);
       if (!files.length) return;
       e.target.value = '';
-      await scanBatch(files);
+      executeWithConsent(async () => {
+        await scanBatch(files);
+      });
     },
-    [scanBatch]
+    [executeWithConsent, scanBatch]
   );
 
   // ─── Confirm single transaction ───────────────────────────────────────────
@@ -327,6 +359,12 @@ export default function ScanSlip({ onTransactionCreate, onClose, t }) {
           </div>
         )}
       </div>
+
+      <AIConsentModal
+        isOpen={showAIConsent}
+        onAccept={handleConsentAccept}
+        onDecline={handleConsentDecline}
+      />
     </div>
   );
 }

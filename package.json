@@ -1,6 +1,6 @@
 {
   "name": "monyema",
-  "version": "2.3.0",
+  "version": "2.4.0",
   "description": "MoneyMa - จัดการการเงินส่วนตัว",
   "homepage": "./",
   "author": "Your Name",
@@ -11,7 +11,7 @@
     "build:mobile": "REACT_APP_VERSION=$npm_package_version REACT_APP_MOBILE_BUILD=true GENERATE_SOURCEMAP=false react-scripts build && node scripts/strip-web-only-assets.js",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
-    "build-android": "npm run build:mobile && npx cap sync android",
+    "build-android": "node scripts/patch-android-plugins.js && npm run build:mobile && npx cap sync android",
     "sync-android": "npm run build:mobile && npx cap copy android",
     "build-android-release": "npm run build && cd android && ./gradlew assembleRelease",
     "build-ios": "npm run build:mobile && npx cap sync ios",
@@ -21,9 +21,11 @@
     "export-ios-appstore": "xcodebuild -exportArchive -archivePath /tmp/pfm-ios-archives/MoneyMa.xcarchive -exportPath /tmp/pfm-ios-exports/app-store -exportOptionsPlist ios/App/ExportOptions/AppStore.plist",
     "export-ios-development": "xcodebuild -exportArchive -archivePath /tmp/pfm-ios-archives/MoneyMa.xcarchive -exportPath /tmp/pfm-ios-exports/development -exportOptionsPlist ios/App/ExportOptions/Development.plist",
     "distribute-android": "firebase appdistribution:distribute android/app/build/outputs/apk/release/app-release.apk --app 1:YOUR_PROJECT_NUMBER:android:YOUR_APP_ID --tester-groups testers --release-notes \"Release Build\"",
-    "distribute-ios": "firebase appdistribution:distribute build/ios/ipa/App.ipa --app 1:YOUR_PROJECT_NUMBER:ios:YOUR_APP_ID --tester-groups testers --release-notes \"Release Build\""
+    "distribute-ios": "firebase appdistribution:distribute build/ios/ipa/App.ipa --app 1:YOUR_PROJECT_NUMBER:ios:YOUR_APP_ID --tester-groups testers --release-notes \"Release Build\"",
+    "postinstall": "node scripts/patch-android-plugins.js"
   },
   "dependencies": {
+    "@capacitor-community/apple-sign-in": "^7.1.0",
     "@capacitor/android": "^8.3.4",
     "@capacitor/app": "^8.1.0",
     "@capacitor/camera": "^8.2.0",

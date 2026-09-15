@@ -178,25 +178,26 @@
       </section>
 
       <section id="th-4">
-        <h2>4. การเปิดเผยข้อมูลแก่บุคคลที่สาม</h2>
-        <p><strong>เราไม่ขายข้อมูลส่วนตัวของคุณ</strong></p>
-        <p>เราอาจแบ่งปันข้อมูลในกรณีต่อไปนี้เท่านั้น:</p>
+        <h2>4. การเปิดเผยข้อมูลแก่บุคคลที่สามและการคุ้มครองข้อมูล</h2>
+        <p><strong>เราไม่ขายข้อมูลส่วนตัวของคุณแก่บุคคลใด</strong></p>
+        <p>เราเปิดเผยข้อมูลแก่ผู้ให้บริการภายนอกเฉพาะที่จำเป็นต่อการทำงานของแอป โดยยืนยันว่าผู้ให้บริการภายนอกทุกรายมีมาตรฐานการคุ้มครองข้อมูลส่วนบุคคลที่เทียบเท่าหรือสูงกว่ามาตรฐานสากล (เช่น GDPR, CCPA, ISO 27001, SOC 2):</p>
         <ul>
-          <li><strong>Supabase</strong> — ระบบฐานข้อมูลและการยืนยันตัวตน</li>
-          <li><strong>Google Gemini AI</strong> — ประมวลผลรูปภาพสลิปและบิลชั่วคราว (ไม่เก็บรูปถาวร)</li>
-          <li><strong>Firebase (Google)</strong> — รายงาน crash, analytics (ไม่มีข้อมูลการเงิน)</li>
-          <li>เมื่อกฎหมายกำหนดหรือมีคำสั่งศาล</li>
+          <li><strong>Supabase Inc.</strong> — ระบบฐานข้อมูลคลาวด์และการยืนยันตัวตน (เข้ารหัสข้อมูลทั้งในระหว่างการส่งและขณะจัดเก็บ)</li>
+          <li><strong>Google LLC (Google Gemini AI)</strong> — ผู้ให้บริการประมวลผลปัญญาประดิษฐ์เพื่อการอ่านข้อความและสกัดข้อมูลจากภาพ (OCR)</li>
+          <li><strong>Google LLC (Firebase)</strong> — ระบบรายงานข้อผิดพลาดเชิงเทคนิคและ Crash Analytics (ไม่มีข้อมูลธุรกรรมหรือข้อมูลการเงิน)</li>
+          <li>เมื่อมีข้อกำหนดทางกฎหมายหรือคำสั่งศาลที่มีผลผูกพัน</li>
         </ul>
       </section>
 
       <section id="th-5">
-        <h2>5. การสแกนบิลและสลิปด้วย AI</h2>
-        <p>เมื่อคุณใช้ฟีเจอร์สแกนสลิปหรือบิล:</p>
+        <h2>5. การประมวลผลข้อมูลด้วย AI และการขอความยินยอม</h2>
+        <p>MoneyMa มีฟีเจอร์การสแกนสลิป บิล และรูปภาพสินค้าด้วยปัญญาประดิษฐ์ (AI) โดยมีข้อกำหนดการคุ้มครองข้อมูลดังนี้:</p>
         <ul>
-          <li>รูปภาพจะถูกส่งไปยัง Google Gemini AI <strong>เพื่อประมวลผลชั่วคราวเท่านั้น</strong></li>
-          <li>เราไม่เก็บรูปภาพของคุณไว้บนเซิร์ฟเวอร์ของเรา</li>
-          <li>ข้อมูลที่อ่านได้จากสลิปจะถูกนำเข้าแอปเพื่อให้คุณตรวจสอบก่อนบันทึก</li>
-          <li>กล้องใช้สำหรับฟีเจอร์นี้เท่านั้น ไม่มีการบันทึกวิดีโอหรือถ่ายภาพโดยไม่ได้รับอนุญาต</li>
+          <li><strong>ข้อมูลที่ถูกส่ง:</strong> รูปภาพบิล สลิปโอนเงิน หรือสินค้าที่คุณเลือก ซึ่งอาจประกอบด้วยชื่อร้านค้า วันที่ทำรายการ หมวดหมู่ และยอดเงิน</li>
+          <li><strong>ผู้รับข้อมูล:</strong> Google Gemini API ดำเนินการโดย Google LLC ผ่านการเชื่อมต่อแบบเข้ารหัส HTTPS/TLS</li>
+          <li><strong>การขอความยินยอม (In-App Consent):</strong> แอปจะแสดงหน้าต่างขอความยินยอมอย่างชัดเจนก่อนที่ข้อมูลจะถูกส่งไปยังบริการ AI และคุณสามารถให้หรือยกเลิกความยินยอมได้ตลอดเวลาในหน้าการตั้งค่า</li>
+          <li><strong>การประมวลผลชั่วคราวและไม่เก็บถาวร:</strong> รูปภาพจะถูกส่งไปประมวลผลชั่วคราว (Ephemeral Processing) เพื่อสกัดข้อมูลข้อความเท่านั้น โดยไม่มีการบันทึกภาพถาวรบนเซิร์ฟเวอร์ของ MoneyMa หรือ Google และไม่มีการนำข้อมูลของคุณไปใช้ฝึกอบรมโมเดล AI สาธารณะ</li>
+          <li><strong>การควบคุมโดยผู้ใช้:</strong> ข้อมูลที่ AI อ่านได้จะถูกนำมาแสดงในแบบฟอร์มเพื่อให้คุณตรวจสอบและแก้ไขก่อนบันทึกลงในระบบเสมอ</li>
         </ul>
       </section>
 
@@ -331,23 +332,26 @@
       </section>
 
       <section id="en-4">
-        <h2>4. Third-Party Sharing</h2>
-        <p><strong>We do not sell your data.</strong> We share only with:</p>
+        <h2>4. Third-Party Sharing &amp; Data Protection Confirmation</h2>
+        <p><strong>We do not sell your personal data.</strong></p>
+        <p>We share data with third-party service providers solely to the extent necessary to provide the app’s features. We verify and confirm that all third parties provide equal or greater privacy protection standards (including compliance with GDPR, CCPA, ISO 27001, and SOC 2):</p>
         <ul>
-          <li><strong>Supabase</strong> — database and authentication</li>
-          <li><strong>Google Gemini AI</strong> — temporary image processing for AI scan (images not retained)</li>
-          <li><strong>Firebase (Google)</strong> — crash reporting and analytics (no financial data)</li>
-          <li>Law enforcement when legally required</li>
+          <li><strong>Supabase Inc.</strong> — Cloud database infrastructure and authentication with data encryption in transit and at rest.</li>
+          <li><strong>Google LLC (Google Gemini AI)</strong> — Artificial intelligence service for OCR document parsing and financial text extraction.</li>
+          <li><strong>Google LLC (Firebase)</strong> — Crash reporting and performance diagnostics (does not include financial transactions).</li>
+          <li>Law enforcement or regulatory authorities only when required by valid legal process.</li>
         </ul>
       </section>
 
       <section id="en-5">
-        <h2>5. AI Bill &amp; Slip Scanning</h2>
+        <h2>5. Third-Party AI Data Processing &amp; User Consent</h2>
+        <p>MoneyMa provides AI-powered scanning for receipts, bank transfer slips, and product tags, governed by the following strict privacy practices:</p>
         <ul>
-          <li>Images are sent to Google Gemini AI for <strong>temporary processing only</strong></li>
-          <li>We do not store your images on our servers</li>
-          <li>Extracted data is shown in-app for your review before saving</li>
-          <li>Camera is used solely for this feature — no background recording</li>
+          <li><strong>Data Transmitted:</strong> The photo/document you select (such as receipt, invoice, bank transfer slip, or product packaging), including merchant names, transaction dates, item lines, and monetary amounts.</li>
+          <li><strong>Recipient:</strong> Google Gemini API operated by Google LLC via encrypted HTTPS/TLS connections.</li>
+          <li><strong>Explicit In-App Consent:</strong> The app displays a clear permission modal explaining data sharing before any document is sent to the AI service. You may grant or revoke this consent at any time in Settings.</li>
+          <li><strong>Ephemeral Processing &amp; No Retention:</strong> Uploaded images are processed ephemerally solely for OCR extraction. Neither MoneyMa nor Google stores images permanently, and your submissions are never used to train public AI models.</li>
+          <li><strong>User Review &amp; Control:</strong> Extracted data is presented in an editable form for your review and confirmation before any record is saved.</li>
         </ul>
       </section>
 

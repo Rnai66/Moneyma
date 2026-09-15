@@ -11,6 +11,8 @@ import SupabaseService from '../services/SupabaseService';
 import { useSubscription } from '../SubscriptionContext/SubscriptionContext';
 import { APP_VERSION, APP_ICON } from '../config/appInfo';
 import ExportCustomizerModal from '../components/ExportCustomizerModal';
+import AIConsentService from '../services/AIConsentService';
+import PrivacyPolicyModal from '../components/PrivacyPolicyModal';
 
 function ToggleSwitch({ checked, onChange, label }) {
   return (
@@ -58,6 +60,7 @@ function Settings({ darkMode, onDarkModeChange, language, onLanguageChange, tran
   const [message, setMessage] = useState('');
   const [dbInfo, setDbInfo] = useState({ path: '', isCustom: false });
   const [showExportModal, setShowExportModal] = useState(false);
+  const [showPrivacyModal, setShowPrivacyModal] = useState(false);
   const restoreInputRef = useRef(null);
 
   const { user, isAuthenticated, isPro } = useAuth();
@@ -297,9 +300,9 @@ function Settings({ darkMode, onDarkModeChange, language, onLanguageChange, tran
                       ? t.syncStateFailed
                       : t.syncStateUpToDate}
                 </span>
-                {lastSyncedAt && (
+                {(syncStatus?.timestamp || lastSyncedAt) && (
                   <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
-                    {new Date(lastSyncedAt).toLocaleString(language === 'th' ? 'th-TH' : 'en-US')}
+                    {new Date(syncStatus?.timestamp || lastSyncedAt).toLocaleString(language === 'th' ? 'th-TH' : 'en-US')}
                   </span>
                 )}
               </div>
@@ -399,6 +402,53 @@ function Settings({ darkMode, onDarkModeChange, language, onLanguageChange, tran
         </div>
       </SectionCard>
 
+      {/* ── privacy & AI consent ── */}
+      <SectionCard title={language === 'th' ? 'ความเป็นส่วนตัว และ AI' : 'Privacy & AI Services'}>
+        <div className="stack-sm">
+          <SettingRow
+            title={language === 'th' ? 'คำยินยอมการประมวลผลข้อมูลด้วย AI' : 'Third-Party AI Data Processing'}
+            description={
+              language === 'th'
+                ? 'ส่งรูปภาพสลิป/บิลไปยัง Google Gemini AI เพื่ออ่านข้อความแบบชั่วคราว (ไม่เก็บข้อมูลถาวร)'
+                : 'Send receipt/slip images to Google Gemini AI for ephemeral OCR parsing (no permanent storage).'
+            }
+          >
+            <button
+              className={`btn ${AIConsentService.hasConsent() ? 'btn-ghost' : 'btn-primary'}`}
+              onClick={() => {
+                if (AIConsentService.hasConsent()) {
+                  AIConsentService.revokeConsent();
+                  setMessage(language === 'th' ? 'ยกเลิกคำยินยอม AI แล้ว' : 'AI Consent revoked.');
+                } else {
+                  AIConsentService.grantConsent();
+                  setMessage(language === 'th' ? 'ยินยอมการใช้งาน AI แล้ว' : 'AI Consent granted.');
+                }
+              }}
+            >
+              {AIConsentService.hasConsent()
+                ? (language === 'th' ? '✓ ยินยอมแล้ว (กดเพื่อยกเลิก)' : '✓ Granted (Tap to Revoke)')
+                : (language === 'th' ? 'ยังไม่ยินยอม (กดเพื่อให้สิทธิ์)' : 'Not Granted (Tap to Grant)')}
+            </button>
+          </SettingRow>
+
+          <SettingRow
+            title={language === 'th' ? 'นโยบายความเป็นส่วนตัว' : 'Privacy Policy'}
+            description={
+              language === 'th'
+                ? 'อ่านรายละเอียดเกี่ยวกับการจัดเก็บข้อมูล ความปลอดภัย และการเปิดเผยแก่บุคคลที่สาม'
+                : 'Review data collection, retention, and third-party protection policies.'
+            }
+          >
+            <button
+              className="btn btn-ghost"
+              onClick={() => setShowPrivacyModal(true)}
+            >
+              📄 {language === 'th' ? 'เปิดดูนโยบาย' : 'View Policy'}
+            </button>
+          </SettingRow>
+        </div>
+      </SectionCard>
+
       {/* ── about ── */}
       <SectionCard title={t.aboutTitle}>
         <div className="stack">
@@ -433,6 +483,11 @@ function Settings({ darkMode, onDarkModeChange, language, onLanguageChange, tran
           </div>
         </div>
       </SectionCard>
+      <PrivacyPolicyModal
+        isOpen={showPrivacyModal}
+        onClose={() => setShowPrivacyModal(false)}
+        language={language}
+      />
     </div>
   );
 }

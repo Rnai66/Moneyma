@@ -74,6 +74,19 @@ export const AuthProvider = ({ children }) => {
     // Check current session on mount
     const checkSession = async () => {
       try {
+        // Detect and display any OAuth error returning in URL
+        const hashParams = new URLSearchParams(window.location.hash.startsWith('#') ? window.location.hash.slice(1) : '');
+        const searchParams = new URLSearchParams(window.location.search);
+        const oauthErrorDesc = hashParams.get('error_description') || searchParams.get('error_description') || hashParams.get('error') || searchParams.get('error');
+        if (oauthErrorDesc) {
+          const readableError = decodeURIComponent(oauthErrorDesc.replace(/\+/g, ' '));
+          console.error('OAuth URL error detected:', readableError);
+          setError(readableError);
+          window.history.replaceState({}, document.title, window.location.pathname);
+          setLoading(false);
+          return;
+        }
+
         if (foundRecovery) {
           const { session: recoverySession, error: recoveryError } = await SupabaseService.establishRecoverySessionFromUrl();
           if (recoveryError) throw recoveryError;
@@ -83,6 +96,7 @@ export const AuthProvider = ({ children }) => {
             setSession(recoverySession);
             setIsRecovery(true);
             await fetchProfile(recoverySession.user.id);
+            return;
           }
         }
 
@@ -198,6 +212,24 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const signInWithApple = async () => {
+    try {
+      setError(null);
+      const { data, error: appleError } = await SupabaseService.signInWithApple();
+      if (appleError) throw appleError;
+
+      if (data?.session) {
+        setUser(data.session.user);
+        setSession(data.session);
+        await fetchProfile(data.session.user.id);
+      }
+      return { error: null };
+    } catch (err) {
+      setError(err);
+      return { error: err };
+    }
+  };
+
   const signOut = async () => {
     try {
       setError(null);
@@ -214,18 +246,26 @@ export const AuthProvider = ({ children }) => {
         return { error: null };
       }
 
+      // Optimistically clear auth states immediately so UI is instantaneous (< 50ms)
+      setUser(null);
+      setSession(null);
+      setUserProfile(null);
+      setIsRecovery(false);
+
       const { error: signOutError } = await SupabaseService.signOut();
+      if (signOutError) {
+        console.warn('Supabase sign out notice:', signOutError);
+      }
 
-      if (signOutError) throw signOutError;
-
+      return { error: null };
+    } catch (err) {
+      console.error('Sign out error:', err);
+      // Guarantee local auth state is reset regardless of error
       setUser(null);
       setSession(null);
       setUserProfile(null);
       setIsRecovery(false);
       return { error: null };
-    } catch (err) {
-      setError(err);
-      return { error: err };
     }
   };
 
@@ -308,6 +348,7 @@ export const AuthProvider = ({ children }) => {
     signUp,
     signIn,
     signInWithGoogle,
+    signInWithApple,
     signOut,
     enableDevBypass,
     resetPassword,

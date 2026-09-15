@@ -1,0 +1,568 @@
+<title>ชุดลุย 10 ร้านแรก</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bai+Jamjuree:wght@500;600;700&family=Sarabun:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" />
+
+<style>
+  :root {
+    --paper:      #F7F6F2;
+    --surface:    #FFFFFF;
+    --surface-2:  #F0EEE8;
+    --ink:        #1A1E1B;
+    --ink-soft:   #5C625C;
+    --ink-faint:  #8D938C;
+    --line:       #DFDCD3;
+    --jade:       #0F6B4F;
+    --jade-soft:  #E3F0EA;
+    --ember:      #B4551C;
+    --ember-soft: #F7EADF;
+    --crimson:    #9E2637;
+
+    --f-display: 'Bai Jamjuree', 'Noto Sans Thai', system-ui, sans-serif;
+    --f-body:    'Sarabun', 'Noto Sans Thai', system-ui, sans-serif;
+    --f-mono:    'IBM Plex Mono', ui-monospace, Menlo, monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper:      #151816;
+      --surface:    #1D211E;
+      --surface-2:  #262B27;
+      --ink:        #E7E9E4;
+      --ink-soft:   #A6ACA4;
+      --ink-faint:  #767C74;
+      --line:       #333935;
+      --jade:       #4FBF93;
+      --jade-soft:  #1B2E26;
+      --ember:      #E0955F;
+      --ember-soft: #2E241A;
+      --crimson:    #E0798A;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --paper:      #151816;
+    --surface:    #1D211E;
+    --surface-2:  #262B27;
+    --ink:        #E7E9E4;
+    --ink-soft:   #A6ACA4;
+    --ink-faint:  #767C74;
+    --line:       #333935;
+    --jade:       #4FBF93;
+    --jade-soft:  #1B2E26;
+    --ember:      #E0955F;
+    --ember-soft: #2E241A;
+    --crimson:    #E0798A;
+  }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--f-body);
+    font-size: 15px;
+    line-height: 1.65;
+    padding: 0 16px 64px;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  .wrap { max-width: 560px; margin: 0 auto; }
+
+  /* ── หัวเรื่อง ── */
+  .masthead { padding-block: 32px 20px; }
+  .kicker {
+    font-family: var(--f-display);
+    font-size: 11px; font-weight: 600;
+    letter-spacing: .14em; text-transform: uppercase;
+    color: var(--jade);
+  }
+  h1 {
+    font-family: var(--f-display);
+    font-size: clamp(27px, 7vw, 34px);
+    font-weight: 700; line-height: 1.2;
+    margin-top: 4px; text-wrap: balance;
+  }
+  .standfirst {
+    color: var(--ink-soft); font-size: 14px;
+    margin-top: 10px; max-width: 46ch;
+  }
+
+  /* ── หน้าปัด ── */
+  .gauge {
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    gap: 1px; background: var(--line);
+    border: 1px solid var(--line); border-radius: 10px;
+    overflow: hidden; margin-bottom: 34px;
+  }
+  .gauge div { background: var(--surface); padding: 12px 10px; }
+  .gauge dt {
+    font-size: 10.5px; letter-spacing: .06em;
+    color: var(--ink-faint); font-family: var(--f-display); font-weight: 600;
+  }
+  .gauge dd {
+    font-family: var(--f-mono); font-size: 22px;
+    font-variant-numeric: tabular-nums; margin-top: 1px;
+  }
+  .gauge .warn dd { color: var(--ember); }
+
+  /* ── หัวข้อหมวด ── */
+  h2 {
+    font-family: var(--f-display); font-weight: 700;
+    font-size: 19px; margin-bottom: 4px;
+  }
+  .sub { color: var(--ink-soft); font-size: 13.5px; margin-bottom: 16px; }
+  section { margin-bottom: 42px; }
+
+  /* ── สคริปต์แบบจับเวลา ── */
+  /* เวลาคือโครงจริงของงานนี้ ไม่ใช่เลขประดับ — 3 นาทีคือเพดานความอดทน
+     ของคนที่กำลังขายของอยู่ */
+  .beat {
+    display: grid; grid-template-columns: 62px 1fr;
+    gap: 14px; padding: 16px 0;
+    border-top: 1px solid var(--line);
+  }
+  .beat:last-child { border-bottom: 1px solid var(--line); }
+  .clock {
+    font-family: var(--f-mono); font-size: 12px;
+    color: var(--jade); font-variant-numeric: tabular-nums;
+    padding-top: 2px;
+  }
+  .beat h3 { font-family: var(--f-display); font-size: 15.5px; font-weight: 600; }
+  .beat p { font-size: 14px; margin-top: 3px; }
+  .say {
+    display: block; margin-top: 8px; padding: 10px 12px;
+    background: var(--jade-soft); border-radius: 8px;
+    font-size: 14px; color: var(--ink);
+  }
+  .say::before {
+    content: 'พูดว่า'; display: block;
+    font-family: var(--f-display); font-size: 10px; font-weight: 600;
+    letter-spacing: .1em; color: var(--jade); margin-bottom: 2px;
+  }
+  .why {
+    display: block; margin-top: 7px; font-size: 13px;
+    color: var(--ink-soft); border-left: 2px solid var(--line);
+    padding-left: 10px;
+  }
+
+  /* ── ห้ามพูด ── */
+  .forbid {
+    background: var(--ember-soft);
+    border-radius: 12px; padding: 16px 18px;
+  }
+  .forbid h2 { color: var(--ember); }
+  .forbid ul { list-style: none; display: grid; gap: 11px; margin-top: 12px; }
+  .forbid li { font-size: 14px; padding-left: 22px; position: relative; }
+  .forbid li::before {
+    content: '✕'; position: absolute; left: 0; top: 0;
+    color: var(--ember); font-size: 13px;
+  }
+  .forbid b { font-weight: 600; }
+  .forbid span { display: block; color: var(--ink-soft); font-size: 13px; }
+
+  /* ── เช็คลิสต์ ── */
+  .watch { display: grid; gap: 0; }
+  .watch li {
+    list-style: none; display: grid;
+    grid-template-columns: 24px 1fr; gap: 10px;
+    padding: 11px 0; border-bottom: 1px solid var(--line);
+    font-size: 14px;
+  }
+  .watch li span {
+    font-family: var(--f-mono); font-size: 12px; color: var(--ink-faint);
+    padding-top: 2px;
+  }
+
+  /* ── ร้าน ── */
+  .shops { display: grid; gap: 8px; }
+  .shop {
+    border: 1px solid var(--line); border-radius: 10px;
+    background: var(--surface); overflow: hidden;
+  }
+  .shop.empty { background: transparent; border-style: dashed; }
+  .shop.due { border-color: var(--ember); }
+
+  .shop-head {
+    width: 100%; display: grid;
+    grid-template-columns: 26px 1fr auto; align-items: center; gap: 10px;
+    padding: 13px 14px; background: none; border: 0;
+    font-family: var(--f-body); font-size: 15px; color: var(--ink);
+    text-align: right; cursor: pointer;
+  }
+  .shop-head:focus-visible { outline: 2px solid var(--jade); outline-offset: -2px; }
+  .slot-no {
+    font-family: var(--f-mono); font-size: 12px;
+    color: var(--ink-faint); font-variant-numeric: tabular-nums;
+  }
+  .shop-name { text-align: left; font-weight: 500; }
+  .shop.empty .shop-name { color: var(--ink-faint); font-weight: 400; }
+  .shop-meta { font-size: 12px; color: var(--ink-soft); font-weight: 400; }
+
+  .pill {
+    font-family: var(--f-display); font-size: 10.5px; font-weight: 600;
+    padding: 3px 8px; border-radius: 99px; white-space: nowrap;
+  }
+  .pill.still   { background: var(--jade-soft);  color: var(--jade); }
+  .pill.stopped { background: var(--surface-2);  color: var(--ink-faint); }
+  .pill.due     { background: var(--ember-soft); color: var(--ember); }
+
+  .editor { padding: 0 14px 16px; display: grid; gap: 13px; }
+  label {
+    display: block; font-family: var(--f-display);
+    font-size: 11px; font-weight: 600; letter-spacing: .05em;
+    color: var(--ink-soft); margin-bottom: 5px;
+  }
+  .hint { font-weight: 400; letter-spacing: 0; color: var(--ink-faint); }
+  input, textarea, select {
+    width: 100%; font-family: var(--f-body); font-size: 15px;
+    color: var(--ink); background: var(--paper);
+    border: 1px solid var(--line); border-radius: 8px;
+    padding: 9px 11px;
+  }
+  input:focus-visible, textarea:focus-visible, select:focus-visible {
+    outline: 2px solid var(--jade); outline-offset: 1px; border-color: transparent;
+  }
+  textarea { min-height: 76px; resize: vertical; line-height: 1.55; }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 11px; }
+
+  .actions { display: flex; gap: 9px; align-items: center; margin-top: 3px; }
+  button.save, button.ghost {
+    font-family: var(--f-display); font-weight: 600; font-size: 14px;
+    padding: 10px 18px; border-radius: 8px; border: 1px solid transparent;
+    cursor: pointer;
+  }
+  button.save  { background: var(--jade); color: #fff; }
+  button.ghost { background: none; color: var(--ink-soft); border-color: var(--line); }
+  button:disabled { opacity: .5; cursor: default; }
+  .saved { font-size: 12.5px; color: var(--jade); }
+
+  .notice {
+    font-size: 13px; color: var(--ink-soft);
+    background: var(--surface-2); border-radius: 8px;
+    padding: 10px 12px; margin-bottom: 14px;
+  }
+  .colophon {
+    font-size: 12.5px; color: var(--ink-faint);
+    border-top: 1px solid var(--line); padding-top: 16px;
+  }
+
+  [hidden] { display: none !important; }
+  @media (prefers-reduced-motion: no-preference) {
+    .editor { animation: open .18s ease-out; }
+    @keyframes open { from { opacity: .4; } to { opacity: 1; } }
+  }
+  @media (max-width: 380px) {
+    .row { grid-template-columns: 1fr; }
+    .beat { grid-template-columns: 52px 1fr; gap: 10px; }
+  }
+</style>
+
+<div class="wrap">
+  <header class="masthead">
+    <div class="kicker">MoneyMa POS · ภาคสนาม</div>
+    <h1>ชุดลุย 10 ร้านแรก</h1>
+    <p class="standfirst">
+      สิบร้านที่รู้จักชื่อเจ้าของ ไม่ใช่ร้อยร้านที่ส่งข้อความไปแล้วเงียบ
+      งานนี้ delegate ให้ agent ไม่ได้ เพราะคนแปลกหน้าต้องเชื่อใจพอจะเอาระบบไปคุมเงินสดหน้าร้าน
+    </p>
+  </header>
+
+  <dl class="gauge">
+    <div><dt>สาธิตแล้ว</dt><dd id="g-demo">0 / 10</dd></div>
+    <div><dt>ยังใช้อยู่</dt><dd id="g-alive">0</dd></div>
+    <div class="warn"><dt>ถึงเวลาเช็ค</dt><dd id="g-due">0</dd></div>
+  </dl>
+
+  <section>
+    <h2>สคริปต์สาธิต 3 นาที</h2>
+    <p class="sub">สามนาทีคือเพดานความอดทนของคนที่กำลังขายของอยู่ เกินกว่านี้เขาจะเริ่มมองลูกค้าที่รอ</p>
+
+    <div class="beat">
+      <div class="clock">0:00<br />–0:20</div>
+      <div>
+        <h3>เปิดตัวแบบไม่ขาย</h3>
+        <em class="say">สวัสดีครับ ผมทำแอปขายหน้าร้านเอง ตอนนี้ยังไม่มีร้านไหนใช้เลย
+          ขอลองให้พี่ดู 3 นาทีได้ไหมครับ ถ้าไม่เข้าท่าบอกได้เลย</em>
+        <em class="why">บอกไปเลยว่ายังไม่มีร้านใช้ คนขายของจับโกหกเซลล์ได้ใน 5 วินาที
+          แต่ให้อภัยคนที่พูดตรงเสมอ</em>
+      </div>
+    </div>
+
+    <div class="beat">
+      <div class="clock">0:20<br />–1:20</div>
+      <div>
+        <h3>ขายของจริงหนึ่งใบ ด้วยสินค้าของเขา</h3>
+        <p>ถามว่า “ร้านพี่ขายอะไรดีที่สุดครับ” แล้วเพิ่มสินค้านั้นสด ๆ ตรงนั้น
+          กดขาย → พรีวิวใบเสร็จ → ยืนยัน → ให้เขาเห็นสต็อกลดลง</p>
+        <em class="why">ห้ามใช้สินค้าตัวอย่างในแอป ชื่อสินค้าของเขาเองบนหน้าจอ
+          คือสิ่งเดียวที่ทำให้เขามองว่านี่เป็นของจริง · และห้ามอธิบายระหว่างกด ให้เขาดูเฉย ๆ</em>
+      </div>
+    </div>
+
+    <div class="beat">
+      <div class="clock">1:20<br />–2:00</div>
+      <div>
+        <h3>ส่งเครื่องให้เขากดเอง แล้วเงียบ</h3>
+        <em class="say">ลองขายเองสักใบครับ</em>
+        <em class="why">สี่สิบวินาทีนี้มีค่าที่สุดในทั้งงาน อย่าช่วย อย่าชี้ อย่าพูด
+          ตรงที่เขาหยุดมือคือสิ่งที่คุณมาเก็บ ไม่ใช่คำชม</em>
+      </div>
+    </div>
+
+    <div class="beat">
+      <div class="clock">2:00<br />–2:30</div>
+      <div>
+        <h3>พิมพ์ใบเสร็จให้เห็นกระดาษออกจริง</h3>
+        <p>ถ้าร้านมีเครื่องพิมพ์ ต่อเลย — ตั้งความกว้างให้ตรงกระดาษ 58 หรือ 80 มม.
+          แล้วกดทดสอบการพิมพ์ก่อน</p>
+        <em class="why">ถ้าเขาใช้ Android จะไม่มีปุ่มพิมพ์ (WebView ของ Android ไม่มีระบบพิมพ์)
+          ให้ใช้ “บันทึกเป็นรูปภาพ” แล้วส่งเข้าแอปเครื่องพิมพ์หรือ LINE — รู้ไว้ก่อน
+          จะได้ไม่ยืนงงหน้าร้าน</em>
+      </div>
+    </div>
+
+    <div class="beat">
+      <div class="clock">2:30<br />–3:00</div>
+      <div>
+        <h3>ปิดด้วยการขอสิ่งเดียว</h3>
+        <em class="say">พี่ลองใช้ขายจริงสัก 3 วันได้ไหมครับ
+          ผมจะกลับมาถามว่าติดตรงไหน</em>
+        <em class="why">ไม่ขอเงิน ไม่พูดเรื่องแพ็กเกจ ไม่ให้ส่วนลด
+          ถ้าเขาถามราคาเอง นั่นคือสัญญาณซื้อที่แท้จริง — ตอบว่า
+          “ช่วงนี้ยังไม่เก็บครับ ผมอยากได้คนใช้จริงก่อน” แล้วจดไว้ว่าเขาถาม</em>
+      </div>
+    </div>
+  </section>
+
+  <section class="forbid">
+    <h2>สามประโยคที่ห้ามพูด</h2>
+    <ul>
+      <li><b>“ช่วยให้ร้านขายดีขึ้น”</b>
+        <span>ยังไม่มีข้อมูลรองรับสักตัว และคนขายของได้ยินประโยคนี้มาทั้งชีวิต</span></li>
+      <li><b>อะไรก็ตามที่เกี่ยวกับภาษี</b>
+        <span>แอปการเงินพูดผิดเรื่องภาษีคือเรื่องใหญ่จริง ไม่ใช่แค่เสียลูกค้า</span></li>
+      <li><b>“เดี๋ยวเวอร์ชันหน้าจะมี…”</b>
+        <span>ฟีเจอร์ที่ยังไม่มี อย่าสัญญา เขาจะจำ แล้วจะถามในวันที่คุณยังทำไม่เสร็จ</span></li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>ตอนเขากดเอง ให้ดูหกอย่างนี้</h2>
+    <p class="sub">จดตอนนั้นเลย อย่าเก็บไว้จดตอนกลับถึงบ้าน ความจำจะแต่งเรื่องให้เข้าข้างตัวเอง</p>
+    <ul class="watch">
+      <li><span>01</span>เขาหาปุ่มขายเจอภายใน 10 วินาทีไหม</li>
+      <li><span>02</span>เขากดอะไรผิดเป็นอย่างแรก</li>
+      <li><span>03</span>ตรงหน้าพรีวิวใบเสร็จ เขารู้ไหมว่าต้องกดยืนยันอีกที</li>
+      <li><span>04</span>คำถามแรกที่เขาถามคืออะไร — จดคำเป๊ะ ๆ</li>
+      <li><span>05</span>เขาหยิบวิธีเดิมขึ้นมาเทียบไหม (สมุด · LINE · เครื่องเช่า)</li>
+      <li><span>06</span>เขาถามราคาเองหรือเปล่า</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>บันทึกร้าน</h2>
+    <p class="sub">สามช่องต่อร้าน — ติดตรงไหน · ใช้อะไรอยู่ก่อน · วันที่ 3 ยังเปิดอยู่ไหม
+      ข้อสุดท้ายสำคัญที่สุดและเดาแทนไม่ได้</p>
+    <p class="notice" id="db-note" hidden></p>
+    <div class="shops" id="shops"></div>
+  </section>
+
+  <p class="colophon">
+    เกณฑ์กลับมาสร้าง agent team: ร้าน active ราว 20–30 ร้าน หรือใบเสร็จ 500 ใบ/วัน
+    เพราะถ้าจะแยกให้ออกว่า install ต่อใบเสร็จอยู่ที่ 1% หรือ 2%
+    ต้องมีใบเสร็จสะสมราว 2,000–3,000 ใบ ต่ำกว่านั้นทุกตัวเลขคือ noise
+  </p>
+</div>
+
+<script>
+(function () {
+  var SLOTS = 10;
+  var SEGMENTS = ['ร้านกาแฟ', 'ร้านอาหารตามสั่ง', 'ร้านชำ', 'แผงตลาดนัด', 'คลินิก', 'อื่น ๆ'];
+  var BEFORE = ['สมุด/กระดาษ', 'LINE + เครื่องคิดเลข', 'เครื่อง POS เช่า', 'Loyverse / แอปอื่น', 'ไม่ได้จดเลย'];
+  var DAY3 = { pending: 'ยังไม่ถึงวัน', still: 'ยังใช้อยู่', stopped: 'เลิกใช้แล้ว' };
+
+  var store = null;          // db collection ref เมื่อใช้ได้
+  var shops = {};            // id -> record
+  var openId = null;
+  var listEl = document.getElementById('shops');
+  var noteEl = document.getElementById('db-note');
+
+  function id(i) { return 'shop-' + String(i).padStart(2, '0'); }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function today() { return new Date().toISOString().slice(0, 10); }
+
+  // ถึงเวลาเช็ควันที่ 3 หรือยัง
+  function isDue(r) {
+    if (!r || !r.demoDate) return false;
+    if (r.day3 && r.day3 !== 'pending') return false;
+    var due = new Date(r.demoDate + 'T00:00:00');
+    due.setDate(due.getDate() + 3);
+    return due.toISOString().slice(0, 10) <= today();
+  }
+
+  function gauges() {
+    var done = 0, alive = 0, due = 0;
+    for (var k in shops) {
+      var r = shops[k];
+      if (r && r.name) done++;
+      if (r && r.day3 === 'still') alive++;
+      if (isDue(r)) due++;
+    }
+    document.getElementById('g-demo').textContent = done + ' / ' + SLOTS;
+    document.getElementById('g-alive').textContent = String(alive);
+    document.getElementById('g-due').textContent = String(due);
+  }
+
+  function options(list, selected) {
+    return list.map(function (v) {
+      return '<option value="' + esc(v) + '"' + (v === selected ? ' selected' : '') + '>' + esc(v) + '</option>';
+    }).join('');
+  }
+
+  function rowHtml(i) {
+    var key = id(i);
+    var r = shops[key] || {};
+    var filled = Boolean(r.name);
+    var due = isDue(r);
+    var open = openId === key;
+
+    var pill = '';
+    if (due) pill = '<span class="pill due">ถึงเวลาเช็ค</span>';
+    else if (r.day3 === 'still') pill = '<span class="pill still">ยังใช้อยู่</span>';
+    else if (r.day3 === 'stopped') pill = '<span class="pill stopped">เลิกใช้</span>';
+
+    var meta = filled
+      ? esc([r.segment, r.before].filter(Boolean).join(' · '))
+      : 'ยังไม่ได้ไป';
+
+    var head =
+      '<button class="shop-head" type="button" data-open="' + key + '" aria-expanded="' + open + '">' +
+        '<span class="slot-no">' + String(i).padStart(2, '0') + '</span>' +
+        '<span class="shop-name">' + (filled ? esc(r.name) : 'ร้านที่ ' + i) +
+          '<span class="shop-meta" style="display:block">' + meta + '</span></span>' +
+        pill +
+      '</button>';
+
+    if (!open) {
+      return '<div class="shop ' + (filled ? '' : 'empty ') + (due ? 'due' : '') + '">' + head + '</div>';
+    }
+
+    var editor =
+      '<div class="editor">' +
+        '<div><label for="' + key + '-name">ชื่อร้าน / ชื่อเจ้าของ</label>' +
+          '<input id="' + key + '-name" value="' + esc(r.name) + '" placeholder="เช่น ร้านกาแฟป้าหนิง (พี่หนิง)" /></div>' +
+        '<div class="row">' +
+          '<div><label for="' + key + '-seg">ประเภทร้าน</label>' +
+            '<select id="' + key + '-seg"><option value=""></option>' + options(SEGMENTS, r.segment) + '</select></div>' +
+          '<div><label for="' + key + '-before">ใช้อะไรอยู่ก่อน</label>' +
+            '<select id="' + key + '-before"><option value=""></option>' + options(BEFORE, r.before) + '</select></div>' +
+        '</div>' +
+        '<div><label for="' + key + '-stuck">เขาติดตรงไหน <span class="hint">— จดคำที่เขาพูดจริง ไม่ใช่คำสรุปของคุณ</span></label>' +
+          '<textarea id="' + key + '-stuck" placeholder="&quot;อ้าว กดไปแล้วมันยังไม่ตัดของเหรอ&quot;">' + esc(r.stuck) + '</textarea></div>' +
+        '<div class="row">' +
+          '<div><label for="' + key + '-date">วันที่สาธิต</label>' +
+            '<input id="' + key + '-date" type="date" value="' + esc(r.demoDate) + '" /></div>' +
+          '<div><label for="' + key + '-day3">วันที่ 3</label>' +
+            '<select id="' + key + '-day3">' +
+              Object.keys(DAY3).map(function (k) {
+                return '<option value="' + k + '"' + (r.day3 === k ? ' selected' : '') + '>' + DAY3[k] + '</option>';
+              }).join('') +
+            '</select></div>' +
+        '</div>' +
+        '<div class="actions">' +
+          '<button class="save" type="button" data-save="' + key + '">บันทึก</button>' +
+          '<button class="ghost" type="button" data-close="1">ปิด</button>' +
+          '<span class="saved" data-status="' + key + '"></span>' +
+        '</div>' +
+      '</div>';
+
+    return '<div class="shop ' + (filled ? '' : 'empty ') + (due ? 'due' : '') + '">' + head + editor + '</div>';
+  }
+
+  function render() {
+    var html = '';
+    for (var i = 1; i <= SLOTS; i++) html += rowHtml(i);
+    listEl.innerHTML = html;
+    gauges();
+  }
+
+  listEl.addEventListener('click', function (e) {
+    var openBtn = e.target.closest('[data-open]');
+    if (openBtn) {
+      var key = openBtn.getAttribute('data-open');
+      openId = openId === key ? null : key;
+      render();
+      return;
+    }
+    if (e.target.closest('[data-close]')) { openId = null; render(); return; }
+
+    var saveBtn = e.target.closest('[data-save]');
+    if (saveBtn) save(saveBtn.getAttribute('data-save'), saveBtn);
+  });
+
+  function save(key, btn) {
+    var g = function (suffix) {
+      var el = document.getElementById(key + suffix);
+      return el ? el.value.trim() : '';
+    };
+    var rec = {
+      name: g('-name'),
+      segment: g('-seg'),
+      before: g('-before'),
+      stuck: g('-stuck'),
+      demoDate: g('-date'),
+      day3: g('-day3') || 'pending',
+      updatedAt: new Date().toISOString(),
+    };
+    shops[key] = rec;
+    gauges();
+
+    var status = document.querySelector('[data-status="' + key + '"]');
+    if (!store) {
+      if (status) status.textContent = 'เก็บไว้ในหน้านี้เท่านั้น';
+      return;
+    }
+    btn.disabled = true;
+    if (status) status.textContent = 'กำลังบันทึก…';
+    store.doc(key).set(rec).then(function () {
+      btn.disabled = false;
+      if (status) status.textContent = 'บันทึกแล้ว';
+    }).catch(function (err) {
+      btn.disabled = false;
+      if (status) {
+        status.textContent = err && err.code === 'quota_exceeded'
+          ? 'พื้นที่เต็ม — ลบร้านเก่าออกก่อน'
+          : 'บันทึกไม่สำเร็จ ลองใหม่อีกครั้ง';
+      }
+    });
+  }
+
+  render(); // วาดช่องว่างทั้ง 10 ก่อน ไม่ต้องรอ db
+
+  // ── ต่อกับที่เก็บข้อมูล ───────────────────────────────────
+  (window.claude && window.claude.use ? window.claude.use('db') : Promise.resolve(null))
+    .then(function (db) {
+      if (!db) {
+        noteEl.textContent = 'หน้านี้ยังบันทึกข้อมูลไม่ได้ตอนนี้ — สคริปต์กับเช็คลิสต์ยังใช้ได้ปกติ ให้จดใส่กระดาษไปก่อน';
+        noteEl.hidden = false;
+        return;
+      }
+      store = db.collection('shops');
+      store.onSnapshot(function (snap) {
+        shops = {};
+        snap.docs.forEach(function (d) { if (d.exists) shops[d.id] = d.data() || {}; });
+        render();
+      }, function () {
+        noteEl.textContent = 'การเชื่อมต่อข้อมูลหลุด — กดโหลดหน้าใหม่อีกครั้ง';
+        noteEl.hidden = false;
+      });
+    })
+    .catch(function () {
+      noteEl.textContent = 'หน้านี้ยังบันทึกข้อมูลไม่ได้ตอนนี้ — ให้จดใส่กระดาษไปก่อน';
+      noteEl.hidden = false;
+    });
+})();
+</script>

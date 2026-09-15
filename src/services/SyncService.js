@@ -8,6 +8,18 @@
  */
 
 import SupabaseService from './SupabaseService';
+import { getDeletedIds, unmarkDeleted } from './deletedTransactions';
+
+function generateUUID() {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : ((r & 0x3) | 0x8);
+    return v.toString(16);
+  });
+}
 
 class SyncService {
   constructor() {
@@ -61,21 +73,28 @@ class SyncService {
         progress: 0,
       });
 
-      // Add user_id to transactions for cloud and omit local-only fields.
-      // updated_at is carried through so the merge below can do last-write-wins.
-      const transactionsToSync = localTransactions.map((tx) => ({
-        id: tx.id,
-        user_id: userId,
-        type: tx.type,
-        amount: parseFloat(tx.amount),
-        category: tx.category,
-        description: tx.description || '',
-        date: tx.date,
-        updated_at: SyncService.timestampOf(tx) || new Date().toISOString(),
-      }));
+      // Add user_id to transactions for cloud and sanitize UUIDs & dates
+      const transactionsToSync = (localTransactions || []).map((tx) => {
+        const isValidUUID = typeof tx.id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(tx.id);
+        let cleanDate = new Date().toISOString().split('T')[0];
+        if (typeof tx.date === 'string' && tx.date.trim()) {
+          cleanDate = tx.date.trim().slice(0, 10);
+        }
+
+        return {
+          id: isValidUUID ? tx.id : generateUUID(),
+          user_id: userId,
+          type: tx.type === 'income' ? 'income' : 'expense',
+          amount: Math.abs(Number(tx.amount)) || 0,
+          category: typeof tx.category === 'string' && tx.category.trim() ? tx.category.trim() : 'อื่น ๆ',
+          description: typeof tx.description === 'string' ? tx.description : '',
+          date: cleanDate,
+          updated_at: SyncService.timestampOf(tx) || new Date().toISOString(),
+        };
+      });
 
       // Upload to Supabase
-      const { transactions, error } = await SupabaseService.saveTransactions(
+      const { transactions, remapped, error } = await SupabaseService.saveTransactions(
         userId,
         transactionsToSync
       );
@@ -91,7 +110,7 @@ class SyncService {
         timestamp: this.lastSyncTimestamp,
       });
 
-      return { success: true, syncedCount: transactions?.length || 0 };
+      return { success: true, syncedCount: transactions?.length || 0, remapped: remapped || [] };
     } catch (error) {
       console.error('Sync to cloud error:', error);
 
@@ -172,24 +191,50 @@ class SyncService {
     try {
       this.isSyncing = true;
 
+      /**
+       * ขั้น 0 — เคลียร์รายการที่ผู้ใช้ลบไปแล้วก่อนทำอย่างอื่น
+       * ถ้าข้ามขั้นนี้ แถวที่ลบจะถูกอัปโหลดกลับขึ้นไป (ถ้ายังอยู่ใน local)
+       * หรือถูกดาวน์โหลดกลับลงมา (ถ้ายังอยู่บนคลาวด์) แล้วโผล่ให้ผู้ใช้เห็นอีก
+       */
+      const deletedIds = getDeletedIds();
+      if (deletedIds.size) {
+        const { deleted } = await SupabaseService.deleteTransactions(userId, [...deletedIds]);
+        // ลบบนคลาวด์สำเร็จแล้วค่อยทิ้ง tombstone — ถ้าเน็ตพังไว้รอบหน้าลองใหม่
+        if (deleted.length) unmarkDeleted(deleted);
+      }
+
+      // ห้ามอัปโหลดสิ่งที่ผู้ใช้ลบไปแล้ว
+      const uploadable = (localTransactions || []).filter((tx) => !deletedIds.has(tx?.id));
+
       // Step 1: Upload local transactions
-      const uploadResult = await this.syncToCloud(userId, localTransactions);
+      const uploadResult = await this.syncToCloud(userId, uploadable);
 
       if (!uploadResult.success) {
-        throw new Error('Failed to upload transactions');
+        throw new Error(uploadResult.error || 'Failed to upload transactions');
       }
+
+      /**
+       * ถ้าคลาวด์ต้องออก id ใหม่ให้แถวไหน (id เดิมเป็นของผู้ใช้คนก่อนบนเครื่องนี้)
+       * ต้องเขียน id ใหม่ทับของเดิมในชุด local ตรงนี้ ไม่งั้นรอบหน้าชนซ้ำ
+       * แล้วแทรกแถวใหม่อีกใบ — คือต้นเหตุที่ database บวมขึ้นเรื่อย ๆ
+       */
+      const remap = new Map((uploadResult.remapped || []).map((r) => [r.from, r.to]));
+      const localAfterRemap = remap.size
+        ? uploadable.map((tx) => (remap.has(tx?.id) ? { ...tx, id: remap.get(tx.id) } : tx))
+        : uploadable;
 
       // Step 2: Download cloud transactions
       const downloadResult = await this.syncFromCloud(userId);
 
       if (!downloadResult.success) {
-        throw new Error('Failed to download transactions');
+        throw new Error(downloadResult.error || 'Failed to download transactions');
       }
 
-      // Step 3: Merge & deduplicate
+      // Step 3: Merge & deduplicate (ไม่เอาสิ่งที่ถูกลบกลับมา)
       const merged = this.mergeTransactions(
-        localTransactions,
-        downloadResult.transactions
+        localAfterRemap,
+        downloadResult.transactions,
+        deletedIds
       );
 
       this.notifySyncStatus({
@@ -262,15 +307,19 @@ class SyncService {
    * Merge local and cloud transactions.
    * Deduplicates by id; the most recently updated copy wins.
    */
-  mergeTransactions(local = [], cloud = []) {
+  mergeTransactions(local = [], cloud = [], deletedIds = new Set()) {
     const merged = new Map();
+    // 🔴 ตัวกรองนี้คือสิ่งที่ทำให้ "ลบแล้วหายจริง"
+    // ถ้าไม่มี แถวที่ยังค้างบนคลาวด์จะถูกใส่กลับเข้าชุดผลลัพธ์
+    // แล้ว App.js เขียนทับ localStorage = รายการที่ลบไปโผล่กลับมาเอง
+    const isDeleted = (id) => deletedIds && deletedIds.has(id);
 
     cloud.forEach((tx) => {
-      if (tx?.id) merged.set(tx.id, { ...tx, synced: true });
+      if (tx?.id && !isDeleted(tx.id)) merged.set(tx.id, { ...tx, synced: true });
     });
 
     local.forEach((tx) => {
-      if (!tx?.id) return;
+      if (!tx?.id || isDeleted(tx.id)) return;
 
       const existing = merged.get(tx.id);
       if (!existing) {

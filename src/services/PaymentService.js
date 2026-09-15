@@ -1,34 +1,10 @@
 import { Purchases } from '@revenuecat/purchases-capacitor';
 import { Capacitor } from '@capacitor/core';
+import { ensureConfigured } from './rcClient';
 
-// Read RevenueCat keys from environment variables or use fallback
-const API_KEY_ANDROID = process.env.REACT_APP_REVENUECAT_API_KEY_ANDROID || ""; // goog_… from RevenueCat → Project settings → API keys
-const API_KEY_IOS = process.env.REACT_APP_REVENUECAT_API_KEY_IOS || "";        // appl_…
+// คีย์ RevenueCat + การตรวจ placeholder ย้ายไปอยู่ที่ src/services/rcClient.js
+// ซึ่งเป็นจุดเดียวที่ configure SDK ได้ (ดูคอมเมนต์ในเมธอด init ด้านล่าง)
 const ENTITLEMENT_ID = "Premium"; // Entitlement ID configured in RevenueCat
-
-/**
- * A RevenueCat SDK key looks like `goog_<22+ random chars>` / `appl_<…>`.
- * The old check only compared against the literal string 'goog_xxxxxx', so a
- * placeholder like 'goog_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx' passed straight
- * through and the SDK was configured with a bogus key — which fails silently
- * and surfaces later as the useless "No subscription offerings available".
- */
-function isValidRevenueCatKey(key, expectedPrefix) {
-  if (typeof key !== 'string') return false;
-
-  const value = key.trim();
-  if (!value.startsWith(`${expectedPrefix}_`)) return false;
-
-  const body = value.slice(expectedPrefix.length + 1);
-  if (body.length < 15) return false;
-
-  // reject obvious placeholders: xxxxx…, 00000…, or a single repeated char
-  if (/^x+$/i.test(body)) return false;
-  if (/^(.)\1+$/.test(body)) return false;
-  if (/xxxx/i.test(body)) return false;
-
-  return true;
-}
 
 class PaymentService {
   isInitialized = false;
@@ -36,72 +12,78 @@ class PaymentService {
   /** why billing is unavailable — surfaced to the UI instead of a cryptic error */
   unavailableReason = null;
 
+  /**
+   * 🔴 ห้าม configure RevenueCat ที่นี่อีก
+   * เดิมเมธอดนี้เรียก Purchases.configure() เองอีกที่หนึ่ง ทั้งที่
+   * SubscriptionContext ก็ configure ไปแล้วตอนแอปเปิด ธง isInitialized กับ
+   * ธงในฝั่ง SubscriptionService ไม่รู้จักกัน SDK จึงถูก configure ซ้ำ
+   * ผลคือ StoreKit listener ถูกรีเซ็ต การซื้อที่กำลังวิ่งอยู่ค้างไม่ resolve
+   * (สาเหตุที่ App Store reject ตามข้อ 2.1a) ตอนนี้เดินผ่าน rcClient ที่เดียว
+   */
   async init(userId = null) {
-    if (this.isInitialized) return;
-
-    const platform = Capacitor.getPlatform();
-
-    try {
-      if (platform === 'android' || platform === 'ios') {
-        const key = platform === 'android' ? API_KEY_ANDROID : API_KEY_IOS;
-        const prefix = platform === 'android' ? 'goog' : 'appl';
-
-        if (!isValidRevenueCatKey(key, prefix)) {
-          console.warn(
-            `[Billing] RevenueCat ${platform} key missing or placeholder. ` +
-            `Set REACT_APP_REVENUECAT_API_KEY_${platform.toUpperCase()} in .env.local ` +
-            `(RevenueCat → Project settings → API keys), then rebuild. Running in mock mode.`
-          );
-          this.isMocked = true;
-          this.unavailableReason = 'not_configured';
-          this.isInitialized = true;
-          return;
-        }
-
-        await Purchases.configure({ apiKey: key, appUserID: userId });
-      } else {
-        // Web is handled via Stripe, so we don't need RevenueCat
-        this.isInitialized = true;
-        return;
-      }
-
-      this.isInitialized = true;
-      console.log('RevenueCat initialized successfully');
-    } catch (error) {
-      console.error('Error initializing RevenueCat:', error);
-      this.isMocked = true;
-      this.unavailableReason = 'init_failed';
-      this.isInitialized = true;
-    }
+    const state = await ensureConfigured(userId);
+    this.isInitialized = true;
+    this.isMocked = !state.ok && state.reason !== 'web';
+    this.unavailableReason = state.ok ? null : state.reason;
+    return state;
   }
 
   async getOfferings() {
     try {
-      if (!this.isInitialized) return null;
+      // เดิมคืน null เงียบ ๆ ถ้ายังไม่ init ทำให้ผู้ที่เรียกโยน "ไม่มีแพ็กเกจ"
+      // ทั้งที่จริงแค่ยังไม่ได้ configure — init ให้เองเลย (idempotent อยู่แล้ว)
+      if (!this.isInitialized) await this.init();
       if (this.isMocked || Capacitor.getPlatform() === 'web') {
         // Web packages are hardcoded in PremiumSettings to use Stripe Price IDs
         return { availablePackages: [] };
       }
 
-      const offerings = await Purchases.getOfferings();
+      let offering = null;
+      try {
+        const offerings = await Promise.race([
+          Purchases.getOfferings(),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Offerings timeout')), 12000)),
+        ]);
+        offering = offerings?.current;
+        console.log('[Billing] offerings จาก RevenueCat · current =',
+          offerings?.current?.identifier || '(ไม่มี)',
+          '· ทั้งหมด =', Object.keys(offerings?.all || {}).join(', ') || '(ว่าง)');
+        if (!offering?.availablePackages?.length && offerings?.all) {
+          offering = Object.values(offerings.all).find(o => o?.availablePackages?.length) || offering;
+        }
+      } catch (err) {
+        console.warn('Purchases.getOfferings() warning:', err);
+      }
 
-      // `current` is null when no offering is marked "current" in RevenueCat —
-      // fall back to the first configured one so a half-set-up dashboard still works.
-      let offering = offerings?.current;
-      if (!offering?.availablePackages?.length && offerings?.all) {
-        offering = Object.values(offerings.all).find(o => o?.availablePackages?.length) || offering;
+      // Fallback for StoreKit in Xcode Simulator: Query products directly from StoreKit
+      if (!offering?.availablePackages?.length) {
+        try {
+          const productIds = ['pro_monthly', 'pro_yearly', 'business_monthly', 'business_yearly'];
+          // เพดานเวลา: ถ้า StoreKit ไม่ตอบ ต้องคืน "ไม่มีแพ็กเกจ" ไม่ใช่ค้าง
+          const { products } = await Promise.race([
+            Purchases.getProducts({ productIdentifiers: productIds }),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('getProducts timeout')), 12000)),
+          ]);
+          console.log('[Billing] ถามร้านตรง ๆ ได้', products?.length || 0, 'รายการ:',
+            (products || []).map((pr) => `${pr.identifier}=${pr.priceString}`).join(', ') || '(ว่าง)');
+          if (products && products.length > 0) {
+            const simulatedPackages = products.map((p) => ({
+              identifier: p.identifier,
+              packageType: p.identifier.includes('yearly') ? 'ANNUAL' : 'MONTHLY',
+              product: p,
+            }));
+            this.unavailableReason = null;
+            return { availablePackages: simulatedPackages };
+          }
+        } catch (e) {
+          console.warn('Purchases.getProducts() fallback error:', e);
+        }
       }
 
       if (!offering?.availablePackages?.length) {
         this.unavailableReason = 'no_offerings';
-        console.warn(
-          '[Billing] RevenueCat returned no packages. Usual causes: ' +
-          '(1) products not created in Play Console, ' +
-          '(2) products not attached to an Offering in RevenueCat, ' +
-          '(3) app not published to any track yet, ' +
-          '(4) running on an emulator without Google Play Store, ' +
-          '(5) Play Service Account not linked in RevenueCat.'
-        );
+      } else {
+        this.unavailableReason = null;
       }
 
       return offering || null;
@@ -126,9 +108,20 @@ class PaymentService {
         return { entitlements: { active: { [ENTITLEMENT_ID]: true } } };
       }
 
-      const { customerInfo } = await Purchases.purchasePackage({ aPackage: packageToBuy });
-      console.log('Purchase successful:', customerInfo);
-      return customerInfo;
+      try {
+        if (packageToBuy?.product && !packageToBuy.identifier?.startsWith('$rc_')) {
+          const { customerInfo } = await Purchases.purchaseStoreProduct({ product: packageToBuy.product });
+          return customerInfo;
+        }
+        const { customerInfo } = await Purchases.purchasePackage({ aPackage: packageToBuy });
+        return customerInfo;
+      } catch (pkgError) {
+        if (packageToBuy?.product) {
+          const { customerInfo } = await Purchases.purchaseStoreProduct({ product: packageToBuy.product });
+          return customerInfo;
+        }
+        throw pkgError;
+      }
     } catch (error) {
       console.error('Error making purchase:', error);
       throw error;

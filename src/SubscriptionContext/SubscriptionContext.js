@@ -6,6 +6,7 @@ import {
   PLANS,
 } from './SubscriptionService';
 import SupabaseService from '../services/SupabaseService';
+import { identifyUser } from '../services/rcClient';
 
 const supabase = SupabaseService.getClient();
 
@@ -71,13 +72,30 @@ export function SubscriptionProvider({ children }) {
     let mounted = true;
 
     async function init() {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user || !mounted) { setLoading(false); return; }
+      // 🔴 ต้องยิงก่อนแตะ Supabase เสมอ และห้าม await
+      // เดิมบรรทัดนี้อยู่ "หลัง" await supabase.auth.getUser() ซึ่งแปลว่า
+      // ถ้าเน็ตช้าหรือ Supabase ตอบช้า RevenueCat จะยังไม่ถูก configure เลย
+      // ผู้ตรวจของ Apple ที่กด "ลองใช้แบบผู้เยี่ยมชม" แล้วรีบกด Subscribe
+      // จึงเจอปุ่มหมุนค้าง เพราะ SDK ยังไม่พร้อม
+      // ไม่ส่ง userId = ใช้ anonymous app user ของ RevenueCat (guest ซื้อได้ทันที)
+      initRevenueCat().catch(console.warn);
 
-      // Init RevenueCat on mobile (non-blocking)
-      initRevenueCat(user.id).catch(console.warn);
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
 
-      await refresh();
+        if (user) {
+          // ผูก anonymous id เดิมเข้ากับ user จริงด้วย logIn ไม่ configure ซ้ำ
+          identifyUser(user.id).catch(console.warn);
+          await refresh();
+        } else {
+          setSubscription({ plan: 'free', status: 'active' });
+        }
+      } catch (err) {
+        console.warn('[Sub] init error:', err);
+        setSubscription({ plan: 'free', status: 'active' });
+      } finally {
+        if (mounted) setLoading(false);
+      }
     }
 
     init();
@@ -87,8 +105,14 @@ export function SubscriptionProvider({ children }) {
   // ── Re-load when auth state changes ────────────────────────────────────────
   useEffect(() => {
     const { data: { subscription: authSub } } = supabase.auth.onAuthStateChange(
-      (event) => {
-        if (event === 'SIGNED_IN') refresh();
+      (event, session) => {
+        if (event === 'SIGNED_IN') {
+          if (session?.user?.id) {
+            // logIn ไม่ใช่ configure — configure ซ้ำคือสิ่งที่ทำให้ปุ่มซื้อค้าง
+            identifyUser(session.user.id).catch(console.warn);
+          }
+          refresh();
+        }
         if (event === 'SIGNED_OUT') {
           setSubscription({ plan: 'free', status: 'active' });
           setLoading(false);

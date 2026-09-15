@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>การจัดระดับอายุและความเหมาะสมของเนื้อหา (Age Suitability) — MoneyMa</title>
+  <link rel="icon" href="/favicon.ico">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #09090b;
+      --card-bg: rgba(24, 24, 27, 0.85);
+      --border: rgba(255, 255, 255, 0.1);
+      --text: #f4f4f5;
+      --text-muted: #a1a1aa;
+      --accent: #10b981;
+      --accent-glow: rgba(16, 185, 129, 0.15);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Plus Jakarta Sans', 'Noto Sans Thai', -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      padding: 40px 20px;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+    }
+    .container {
+      max-width: 800px;
+      width: 100%;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      padding: 40px;
+      backdrop-filter: blur(20px);
+      box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+    }
+    .header {
+      text-align: center;
+      margin-bottom: 36px;
+      padding-bottom: 28px;
+      border-bottom: 1px solid var(--border);
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--accent-glow);
+      color: var(--accent);
+      padding: 6px 16px;
+      border-radius: 100px;
+      font-weight: 700;
+      font-size: 14px;
+      margin-bottom: 16px;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+    .rating-box {
+      display: inline-block;
+      background: #18181b;
+      border: 2px solid var(--accent);
+      color: #fff;
+      font-size: 32px;
+      font-weight: 800;
+      width: 72px;
+      height: 72px;
+      line-height: 68px;
+      border-radius: 16px;
+      margin: 12px auto;
+    }
+    h1 {
+      font-size: 26px;
+      font-weight: 800;
+      margin-bottom: 8px;
+      color: #fff;
+    }
+    .subtitle {
+      color: var(--text-muted);
+      font-size: 15px;
+    }
+    .section {
+      margin-bottom: 28px;
+    }
+    h2 {
+      font-size: 18px;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    p, li {
+      color: var(--text-muted);
+      font-size: 15px;
+      margin-bottom: 8px;
+    }
+    ul {
+      list-style-type: none;
+      padding-left: 0;
+    }
+    li {
+      padding-left: 24px;
+      position: relative;
+      margin-bottom: 10px;
+    }
+    li::before {
+      content: "✓";
+      color: var(--accent);
+      position: absolute;
+      left: 0;
+      font-weight: 700;
+    }
+    .table-box {
+      background: #121215;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 16px;
+      margin-top: 12px;
+    }
+    .table-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 10px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      font-size: 14px;
+    }
+    .table-row:last-child { border-bottom: none; }
+    .table-label { color: var(--text); }
+    .table-val { color: var(--accent); font-weight: 600; }
+    .footer {
+      margin-top: 40px;
+      padding-top: 20px;
+      border-top: 1px solid var(--border);
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 13px;
+    }
+    a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+    a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="badge">ความปลอดภัยและมาตรฐานเนื้อหา</div>
+      <div class="rating-box">4+</div>
+      <h1>การจัดระดับอายุและความเหมาะสมของเนื้อหา</h1>
+      <p class="subtitle">MoneyMa — Personal Finance Management App</p>
+    </div>
+
+    <div class="section">
+      <h2>📌 ข้อมูลระดับอายุ (Age Rating: 4+)</h2>
+      <p>แอปพลิเคชัน <strong>MoneyMa</strong> ได้รับการจัดระดับอายุที่ <strong>4+ (เหมาะสำหรับทุกเพศทุกวัย)</strong> ตามเกณฑ์มาตรฐานของ Apple App Store และ Google Play Store เนื่องจากเป็นแอปพลิเคชันยูทิลิตี้สำหรับบริหารจัดการการเงินส่วนบุคคลและบัญชีรายรับ-รายจ่าย</p>
+    </div>
+
+    <div class="section">
+      <h2>🛡️ มาตรฐานความปลอดภัยของเนื้อหา (Content Safety)</h2>
+      <p>แอปพลิเคชัน MoneyMa ปฏิบัติตามนโยบายความปลอดภัยและไม่มีเนื้อหาที่เป็นอันตรายหรือล่อแหลม ดังนี้:</p>
+      <ul>
+        <li><strong>ไม่มีเนื้อหาสำหรับผู้ใหญ่ (No Mature Themes):</strong> ปราศจากภาพลามกอนาจาร คำหยาบคาย หรือเนื้อหาเกี่ยวกับเรื่องเพศ</li>
+        <li><strong>ไม่มีความรุนแรง (No Violence):</strong> ไม่มีภาพหรือเรื่องราวที่สื่อถึงความรุนแรง อาวุธ หรือสิ่งที่สร้างความตื่นตระหนก</li>
+        <li><strong>ไม่มีการพนัน (No Gambling):</strong> ไม่มีการเล่นพนัน ชิงโชค หรือกล่องสุ่มไอเทม (Loot Boxes)</li>
+        <li><strong>ไม่มีสารเสพติด (No Substances):</strong> ไม่มีการกล่าวถึงหรือสนับสนุนเครื่องดื่มแอลกอฮอล์ ยาสูบ หรือสิ่งเสพติด</li>
+        <li><strong>ไม่มีการท่องเว็บอิสระ (No Unrestricted Web Browsing):</strong> ผู้ใช้ไม่สามารถใช้แอปเพื่อท่องอินเทอร์เน็ตภายนอกได้อย่างอิสระ</li>
+        <li><strong>ไม่มีฟีดโซเชียลสาธารณะ (No Public Social Feed):</strong> ข้อมูลบัญชีและรายการธุรกรรมทั้งหมดเป็นข้อมูลส่วนตัวของผู้ใช้คนเดียว ไม่มีการเผยแพร่สู่สาธารณะ</li>
+      </ul>
+    </div>
+
+    <div class="section">
+      <h2>📊 สรุปการประเมินตามเกณฑ์สากล</h2>
+      <div class="table-box">
+        <div class="table-row">
+          <span class="table-label">Apple App Store Rating</span>
+          <span class="table-val">4+ (All Ages)</span>
+        </div>
+        <div class="table-row">
+          <span class="table-label">Google Play (IARC) Rating</span>
+          <span class="table-val">3+ / Everyone</span>
+        </div>
+        <div class="table-row">
+          <span class="table-label">User Data Privacy</span>
+          <span class="table-val">Encrypted & Private</span>
+        </div>
+        <div class="table-row">
+          <span class="table-label">Third-Party Advertisements</span>
+          <span class="table-val">None (ไม่มีโฆษณาภายนอก)</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>📞 ติดต่อสอบถาม</h2>
+      <p>หากมีข้อสงสัยเกี่ยวกับความเหมาะสมของเนื้อหาหรือนโยบายความเป็นส่วนตัว สามารถติดต่อทีมงานได้ที่:</p>
+      <p>อีเมล: <a href="mailto:Rnaibro@gmail.com">Rnaibro@gmail.com</a> | เว็บไซต์: <a href="https://moneyma-app.netlify.app">https://moneyma-app.netlify.app</a></p>
+    </div>
+
+    <div class="footer">
+      © 2026 MoneyMa. สงวนลิขสิทธิ์ทุกประการ. | <a href="/privacy-policy.html">นโยบายความเป็นส่วนตัว</a>
+    </div>
+  </div>
+</body>
+</html>

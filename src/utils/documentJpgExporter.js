@@ -1,5 +1,7 @@
 import { Share } from '@capacitor/share';
 import { Capacitor } from '@capacitor/core';
+import { Filesystem, Directory } from '@capacitor/filesystem';
+import { drawQrToCanvas } from './qrGen';
 
 /**
  * Renders a Purchase Order (PO) or Sales Order (SO) receipt onto an HTML5 Canvas
@@ -25,10 +27,21 @@ export function generateDocumentJpgDataUrl(docData) {
       vatAmount = 0,
       totalAmount = 0,
       promptPayId = '',
+      shareUrl = '',
+      shareToken = '',
+      shopName = 'MoneyMa Store',
+      shopAddress = '',
+      shopTaxId = '',
+      footerNote = '',
     } = docData;
 
     const isPo = type === 'po';
-    const docTitle = isPo ? 'ใบสั่งซื้อสินค้าเข้าสต็อก (Purchase Order)' : 'ใบสั่งขาย / ใบกำกับภาษีอย่างย่อ (Sales Order)';
+    const isReceipt = type === 'receipt';
+    const docTitle = isPo
+      ? 'ใบสั่งซื้อสินค้าเข้าสต็อก (Purchase Order)'
+      : isReceipt
+        ? 'ใบเสร็จรับเงิน / ใบกำกับภาษีอย่างย่อ (Receipt)'
+        : 'ใบสั่งขาย / ใบกำกับภาษีอย่างย่อ (Sales Order)';
     const partyLabel = isPo ? `ซัพพลายเออร์: ${supplierName}` : `ผู้ซื้อ: ${customerName}`;
     const primaryColor = isPo ? '#059669' : '#4338ca';
     const secondaryColor = isPo ? '#10b981' : '#6366f1';
@@ -39,7 +52,8 @@ export function generateDocumentJpgDataUrl(docData) {
     const itemRowHeight = 44;
     const itemsTableHeight = Math.max(120, items.length * itemRowHeight + 50);
     const summaryHeight = 160;
-    const qrHeight = (!isPo && promptPayId) ? 220 : 60;
+    // เผื่อที่ให้ QR เก็บใบเสร็จด้วย ไม่งั้นมันจะไปทับบรรทัดท้ายเอกสาร
+    const qrHeight = (!isPo && promptPayId) ? 220 : (shareUrl ? 210 : 60);
     const totalHeight = baseHeaderHeight + itemsTableHeight + summaryHeight + qrHeight;
 
     const canvas = document.createElement('canvas');
@@ -89,7 +103,8 @@ function drawRoundRect(ctx, x, y, w, h, r) {
     // Header Text
     ctx.fillStyle = '#ffffff';
     ctx.font = 'bold 22px "Sarabun", "Inter", sans-serif';
-    ctx.fillText(isPo ? '🚚 MoneyMa Store — ใบสั่งซื้อ PO' : '🛒 MoneyMa Store — ใบสั่งขาย SO', margin + 24, margin + 42);
+    const shop = shopName || 'MoneyMa Store';
+    ctx.fillText(isPo ? `🚚 ${shop} — ใบสั่งซื้อ PO` : isReceipt ? `🧾 ${shop} — ใบเสร็จรับเงิน` : `🛒 ${shop} — ใบสั่งขาย SO`, margin + 24, margin + 42);
 
     ctx.font = '13px "Sarabun", "Inter", sans-serif';
     ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
@@ -118,6 +133,13 @@ function drawRoundRect(ctx, x, y, w, h, r) {
       ctx.font = '13px "Sarabun", "Inter", sans-serif';
       ctx.fillStyle = '#64748b';
       ctx.fillText(`Tax ID / เลขประจำตัวผู้เสียภาษี: ${taxId}`, margin + 24, currentY);
+    }
+
+    if (shopAddress || shopTaxId) {
+      currentY += 22;
+      ctx.font = '12px "Sarabun", "Inter", sans-serif';
+      ctx.fillStyle = '#94a3b8';
+      ctx.fillText([shopAddress, shopTaxId ? `เลขผู้เสียภาษีร้าน: ${shopTaxId}` : ''].filter(Boolean).join('  ·  '), margin + 24, currentY);
     }
 
     if (isPo) {
@@ -249,7 +271,7 @@ function drawRoundRect(ctx, x, y, w, h, r) {
         ctx.textAlign = 'center';
         ctx.font = '11px "Sarabun", sans-serif';
         ctx.fillStyle = '#94a3b8';
-        ctx.fillText('ออกเอกสารโดยระบบ MoneyMa Business Stock & POS (monyema.app)', width / 2, totalHeight - margin - 14);
+        ctx.fillText([footerNote, 'ออกเอกสารโดยระบบ MoneyMa Business Stock & POS (monyema.app)'].filter(Boolean).join('  ·  '), width / 2, totalHeight - margin - 14);
 
         resolve(canvas.toDataURL('image/jpeg', 0.95));
       };
@@ -258,15 +280,44 @@ function drawRoundRect(ctx, x, y, w, h, r) {
         ctx.textAlign = 'center';
         ctx.font = '11px "Sarabun", sans-serif';
         ctx.fillStyle = '#94a3b8';
-        ctx.fillText('ออกเอกสารโดยระบบ MoneyMa Business Stock & POS (monyema.app)', width / 2, totalHeight - margin - 14);
+        ctx.fillText([footerNote, 'ออกเอกสารโดยระบบ MoneyMa Business Stock & POS (monyema.app)'].filter(Boolean).join('  ·  '), width / 2, totalHeight - margin - 14);
 
         resolve(canvas.toDataURL('image/jpeg', 0.95));
       };
     } else {
+      // ── QR เก็บใบเสร็จ (ขาของ growth loop) ──
+      // 🔴 วาดจากตารางโมดูลตรงๆ ไม่โหลดรูปจากเน็ต ด้วยสองเหตุผล:
+      //    1. รูปข้ามโดเมนทำให้ canvas โดน taint แล้ว toDataURL() throw
+      //       -> ปุ่ม "บันทึกเป็นรูป" ของ Android พังทั้งปุ่ม
+      //    2. ร้านที่เน็ตหลุดยังต้องได้ใบเสร็จที่มี QR ครบ
+      if (shareUrl) {
+        currentY += 30;
+        const qrSize = 130;
+        const qrX = (width - qrSize) / 2;
+
+        ctx.fillStyle = '#f1f5f9';
+        ctx.beginPath();
+        drawRoundRect(ctx, qrX - 20, currentY, qrSize + 40, qrSize + 56, 12);
+        ctx.fill();
+
+        drawQrToCanvas(ctx, shareUrl, qrX, currentY + 10, qrSize, 2);
+
+        ctx.textAlign = 'center';
+        ctx.font = 'bold 12px "Sarabun", sans-serif';
+        ctx.fillStyle = '#047857';
+        ctx.fillText('สแกนเก็บใบเสร็จใบนี้ไว้ในมือถือ ฟรี', width / 2, currentY + qrSize + 28);
+        if (shareToken) {
+          ctx.font = '10px "Sarabun", sans-serif';
+          ctx.fillStyle = '#94a3b8';
+          ctx.fillText(`รหัส ${shareToken}`, width / 2, currentY + qrSize + 44);
+        }
+        ctx.textAlign = 'left';
+      }
+
       ctx.textAlign = 'center';
       ctx.font = '11px "Sarabun", sans-serif';
       ctx.fillStyle = '#94a3b8';
-      ctx.fillText('ออกเอกสารโดยระบบ MoneyMa Business Stock & POS (monyema.app)', width / 2, totalHeight - margin - 14);
+      ctx.fillText([footerNote, 'ออกเอกสารโดยระบบ MoneyMa Business Stock & POS (monyema.app)'].filter(Boolean).join('  ·  '), width / 2, totalHeight - margin - 14);
 
       resolve(canvas.toDataURL('image/jpeg', 0.95));
     }
@@ -274,52 +325,88 @@ function drawRoundRect(ctx, x, y, w, h, r) {
 }
 
 /**
- * Share or download JPG image file
+ * บันทึก/แชร์ไฟล์ JPG
+ *
+ * 🔴 บนแอปจริง (iOS/Android) ห้ามส่ง data: URL เข้า Share.share()
+ *    ปลั๊กอิน Share รับได้เฉพาะ file:// หรือ https:// -> ต้องเขียนไฟล์ลงเครื่องก่อน
+ *    (แพทเทิร์นเดียวกับที่ dataTransfer.js ใช้ส่งออก Excel/CSV ซึ่งทำงานได้อยู่แล้ว)
+ * 🔴 และ <a download> ใช้ไม่ได้เลยใน WKWebView -> ห้ามใช้เป็นทางหลักบนมือถือ
+ *
  * @param {string} dataUrl - JPG base64 data url
- * @param {string} fileName - Target filename
+ * @param {string} fileName - ชื่อไฟล์ปลายทาง
+ * @returns {Promise<{ok: boolean, cancelled?: boolean, error?: string}>}
  */
 export async function shareOrDownloadJpg(dataUrl, fileName = 'document.jpg') {
-  try {
-    if (Capacitor.isNativePlatform()) {
-      await Share.share({
-        title: 'MoneyMa Business Document',
-        text: 'ใบสั่งซื้อ/ใบสั่งขาย ออกจากระบบ MoneyMa',
-        url: dataUrl,
-        dialogTitle: 'แชร์รูปภาพเอกสาร (.jpg)',
-      });
-      return;
-    }
+  const safeName = (fileName || 'document.jpg').replace(/[^A-Za-z0-9._-]/g, '_');
 
+  if (Capacitor.isNativePlatform()) {
+    try {
+      const base64 = String(dataUrl).split(',')[1];
+      if (!base64) throw new Error('ไม่พบข้อมูลรูปภาพ');
+
+      await Filesystem.writeFile({
+        path: safeName,
+        data: base64,
+        directory: Directory.Cache,
+      });
+
+      const { uri } = await Filesystem.getUri({ path: safeName, directory: Directory.Cache });
+
+      try {
+        await Share.share({
+          title: 'MoneyMa Business Document',
+          text: 'ใบสั่งซื้อ/ใบสั่งขาย ออกจากระบบ MoneyMa',
+          files: [uri],
+          dialogTitle: 'บันทึกรูปภาพ / แชร์เอกสาร (.jpg)',
+        });
+      } catch (eFiles) {
+        // ปลั๊กอินบางเวอร์ชันรับเฉพาะ url
+        await Share.share({
+          title: 'MoneyMa Business Document',
+          text: 'ใบสั่งซื้อ/ใบสั่งขาย ออกจากระบบ MoneyMa',
+          url: uri,
+          dialogTitle: 'บันทึกรูปภาพ / แชร์เอกสาร (.jpg)',
+        });
+      }
+
+      return { ok: true };
+    } catch (err) {
+      const msg = err?.message || String(err);
+      if (/cancel/i.test(msg)) return { ok: false, cancelled: true };
+      console.error('[POS] แชร์ JPG ไม่สำเร็จ:', msg);
+      return { ok: false, error: msg };
+    }
+  }
+
+  // ---- เว็บ/เดสก์ท็อป ----
+  try {
     if (navigator.share && navigator.canShare) {
       try {
         const res = await fetch(dataUrl);
         const blob = await res.blob();
-        const file = new File([blob], fileName, { type: 'image/jpeg' });
+        const file = new File([blob], safeName, { type: 'image/jpeg' });
         if (navigator.canShare({ files: [file] })) {
           await navigator.share({
             files: [file],
             title: 'MoneyMa Business Document',
             text: 'ใบสั่งซื้อ/ใบสั่งขาย',
           });
-          return;
+          return { ok: true };
         }
-      } catch (e) {}
+      } catch (e) {
+        if (/abort|cancel/i.test(e?.message || '')) return { ok: false, cancelled: true };
+      }
     }
 
-    // Browser download
     const a = document.createElement('a');
     a.href = dataUrl;
-    a.download = fileName;
+    a.download = safeName;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
+    return { ok: true };
   } catch (err) {
-    console.error('Share or download JPG error:', err);
-    const a = document.createElement('a');
-    a.href = dataUrl;
-    a.download = fileName;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    console.error('[POS] ดาวน์โหลด JPG ไม่สำเร็จ:', err?.message || err);
+    return { ok: false, error: err?.message || String(err) };
   }
 }

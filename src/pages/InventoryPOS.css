@@ -31,7 +31,7 @@
   padding: 10px 20px;
   border-radius: 12px;
   border: none;
-  background: linear-gradient(135deg, #6366f1 0%, #7c4dff 100%);
+  background: linear-gradient(135deg, #4f46e5 0%, #6534e0 100%);
   color: #fff;
   font-weight: 700;
   font-size: 13px;
@@ -121,7 +121,7 @@
   padding: 10px 20px;
   border-radius: 12px;
   border: none;
-  background: var(--accent-primary, #6366f1);
+  background: var(--btn-accent);
   color: #fff;
   font-weight: 700;
   font-size: 13px;
@@ -345,7 +345,7 @@
 
 .pos-prod-stock {
   font-size: 11px;
-  color: #10b981;
+  color: var(--color-success, #0d9668);
   font-weight: 600;
 }
 
@@ -429,7 +429,7 @@
 }
 
 .pos-grand-total {
-  color: #10b981;
+  color: var(--color-success, #0d9668);
   font-size: 20px;
 }
 
@@ -438,7 +438,7 @@
   padding: 14px;
   border-radius: 14px;
   border: none;
-  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  background: linear-gradient(135deg, #047857 0%, #065f46 100%);
   color: #fff;
   font-size: 14px;
   font-weight: 800;
@@ -477,6 +477,18 @@
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25);
   display: flex;
   flex-direction: column;
+}
+
+/* 🔴 .pos-modal เป็น flex column -> ลูกทุกตัวมี min-width:auto โดยปริยาย
+   แปลว่ามันจะไม่ยอมหดให้เล็กกว่าเนื้อหาข้างใน (เช่นรูปกว้าง 800px)
+   ทำให้เนื้อหาล้นออกนอกกรอบแล้วถูกตัดขอบขวา */
+.pos-modal > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.pos-modal img {
+  max-width: 100%;
 }
 
 .pos-field-row {
@@ -530,7 +542,7 @@
   padding: 10px 24px;
   border-radius: 10px;
   border: none;
-  background: var(--accent-primary, #6366f1);
+  background: var(--btn-accent);
   color: #fff;
   font-weight: 700;
   cursor: pointer;
@@ -576,7 +588,7 @@
 }
 
 .pos-print-toggle input[type="checkbox"] {
-  accent-color: #10b981;
+  accent-color: var(--color-success, #0d9668);
   width: 16px;
   height: 16px;
 }
@@ -656,8 +668,1097 @@
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
   }
-  .pos-table {
-    min-width: 720px;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   ระบบเอกสาร & การพิมพ์ (MoneyMa Print)
+   🔴 ห้ามกลับไปใช้ window.open() + document.write() เพื่อพิมพ์
+      WKWebView ไม่คืนหน้าต่างที่เขียนทับได้ -> ไม่มีอะไรขึ้นเลย
+      วิธีที่ใช้: วาดเอกสารลง #moneyma-print-area แล้ว window.print()
+   ═══════════════════════════════════════════════════════════════ */
+
+.pos-printer-bar .pos-printer-icon {
+  font-size: 18px;
+}
+
+.pos-printer-chip {
+  font-size: 11px;
+  font-weight: 700;
+  color: #475569;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 999px;
+  padding: 3px 10px;
+}
+
+.pos-printer-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.pos-btn-printer-settings {
+  padding: 8px 14px;
+  border-radius: 10px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.pos-btn-printer-settings:hover {
+  border-color: #6366f1;
+  color: #4338ca;
+}
+
+/* ── โครง modal พรีวิว ── */
+.mm-print-modal {
+  max-width: 720px;
+}
+
+.mm-print-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.mm-print-head h3 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 800;
+}
+
+.mm-print-close {
+  background: #f1f5f9;
+  border: none;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.mm-print-warn,
+.mm-print-ok {
+  font-size: 12px;
+  line-height: 1.5;
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+}
+
+.mm-print-warn {
+  background: #fffbeb;
+  border: 1px solid #fcd34d;
+  color: #92400e;
+}
+
+.mm-print-ok {
+  background: #ecfdf5;
+  border: 1px solid #6ee7b7;
+  color: #047857;
+}
+
+.mm-print-scroll {
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 16px;
+  max-height: 55vh;
+  overflow: auto;
+  min-width: 0;
+  display: flex;
+  justify-content: center;
+}
+
+.mm-print-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 14px;
+  flex-wrap: wrap;
+}
+
+.mm-btn {
+  padding: 10px 16px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  border: none;
+}
+
+.mm-btn-primary {
+  background: linear-gradient(135deg, #4f46e5 0%, #3730a3 100%);
+  color: #fff;
+}
+
+.mm-btn-line {
+  background: #ffffff;
+  border: 1px solid #6366f1;
+  color: #4338ca;
+}
+
+.mm-btn-ghost {
+  background: #e2e8f0;
+  color: #475569;
+}
+
+.mm-hint {
+  font-size: 12px;
+  line-height: 1.6;
+  color: #64748b;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin: 0 0 14px 0;
+}
+
+.mm-seg {
+  display: flex;
+  gap: 8px;
+}
+
+.mm-seg button {
+  flex: 1;
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px solid var(--color-border-strong, #cbd5e1);
+  background: transparent;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-secondary, #475569);
+  cursor: pointer;
+}
+
+/* ตัวที่ถูกเลือกต้องเด่นกว่าเสมอ — ของเดิมตัวที่ไม่ถูกเลือกเป็นพื้นขาวจึงเด่นกว่า */
+.mm-seg button.active {
+  background: var(--btn-accent);
+  border-color: var(--btn-accent);
+  color: #fff;
+  font-weight: 700;
+}
+
+.mm-seg button.active {
+  border-color: #4338ca;
+  background: #eef2ff;
+  color: #4338ca;
+}
+
+/* ── ใบเสร็จแบบสลิป ── */
+.mm-slip {
+  background: #fff;
+  color: #000;
+  font-family: 'Sarabun', -apple-system, sans-serif;
+  font-size: 12px;
+  line-height: 1.45;
+  padding: 6mm 4mm;
+  box-sizing: border-box;
+  max-width: 100%;
+}
+
+.mm-slip-shop {
+  text-align: center;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.mm-slip-sub {
+  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
+  margin-top: 2px;
+}
+
+.mm-dash {
+  border-top: 1px dashed #000;
+  margin: 6px 0;
+}
+
+.mm-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.mm-row span:last-child {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.mm-item {
+  margin-bottom: 4px;
+}
+
+.mm-item-name {
+  font-weight: 700;
+  word-break: break-word;
+}
+
+.mm-total {
+  font-size: 15px;
+  font-weight: 800;
+  margin-top: 4px;
+}
+
+.mm-center {
+  text-align: center;
+}
+
+.mm-small {
+  font-size: 11px;
+}
+
+/* ── เอกสารเต็มหน้า SO / PO ── */
+.mm-doc {
+  background: #fff;
+  color: #0f172a;
+  font-family: 'Sarabun', -apple-system, sans-serif;
+  font-size: 12px;
+  width: 190mm;
+  max-width: 100%;
+  padding: 10mm;
+  box-sizing: border-box;
+}
+
+.mm-doc-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 2px solid #4338ca;
+  padding-bottom: 10px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.mm-doc-po .mm-doc-head {
+  border-bottom-color: #059669;
+}
+
+.mm-doc-head h1 {
+  margin: 0;
+  font-size: 19px;
+  color: #4338ca;
+}
+
+.mm-doc-po .mm-doc-head h1 {
+  color: #047857;
+}
+
+.mm-doc-head p {
+  margin: 2px 0 0 0;
+  font-size: 11px;
+  color: #64748b;
+}
+
+.mm-doc-meta {
+  text-align: right;
+}
+
+.mm-doc-no {
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.mm-doc-parties {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.mm-doc-right {
+  text-align: right;
+}
+
+.mm-doc-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 14px;
+}
+
+.mm-doc-table th {
+  background: #4338ca;
+  color: #fff;
+  text-align: left;
+  padding: 7px 10px;
+  font-size: 11px;
+}
+
+.mm-doc-po .mm-doc-table th {
+  background: #047857;
+}
+
+.mm-doc-table td {
+  border-bottom: 1px solid #e2e8f0;
+  padding: 7px 10px;
+  vertical-align: top;
+  word-break: break-word;
+}
+
+.mm-right {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.mm-sku {
+  font-family: monospace;
+  color: #64748b;
+  white-space: nowrap;
+}
+
+.mm-doc-summary {
+  margin-left: auto;
+  width: 260px;
+  max-width: 100%;
+}
+
+.mm-doc-summary > div {
+  display: flex;
+  justify-content: space-between;
+  padding: 3px 0;
+  color: #475569;
+}
+
+.mm-doc-grand {
+  border-top: 2px solid #0f172a;
+  margin-top: 6px;
+  padding-top: 6px !important;
+  font-size: 15px;
+  font-weight: 800;
+  color: #0f172a !important;
+}
+
+.mm-doc-qr {
+  text-align: center;
+  margin-top: 18px;
+  font-size: 11px;
+  color: #475569;
+}
+
+.mm-doc-qr img {
+  width: 120px;
+  height: 120px;
+  display: block;
+  margin: 6px auto;
+}
+
+.mm-doc-foot {
+  margin-top: 18px;
+  text-align: center;
+  font-size: 10px;
+  color: var(--color-text-secondary, #635a7e);
+}
+
+/* ── ทะเบียนเอกสารที่ออกแล้ว ── */
+.mm-history {
+  margin-top: 18px;
+  border-top: 1px solid var(--color-border, #e2e8f0);
+  padding-top: 14px;
+}
+
+.mm-history h4 {
+  margin: 0 0 10px 0;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--color-text-primary, #0f172a);
+}
+
+.mm-history-empty {
+  font-size: 12px;
+  color: var(--color-text-secondary, #635a7e);
+  padding: 10px 0;
+}
+
+.mm-history-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 9px 10px;
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 10px;
+  margin-bottom: 6px;
+  background: var(--bg-card, #fff);
+}
+
+.mm-history-main {
+  min-width: 0;
+}
+
+.mm-history-no {
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.mm-history-sub {
+  font-size: 11px;
+  color: #64748b;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mm-history-amt {
+  font-size: 13px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.mm-history-open {
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  color: #334155;
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+/* ═══════════ โหมดพิมพ์: โชว์เฉพาะเอกสาร ═══════════ */
+@media print {
+  body * {
+    visibility: hidden !important;
+  }
+
+  #moneyma-print-area,
+  #moneyma-print-area * {
+    visibility: visible !important;
+  }
+
+  #moneyma-print-area {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+    box-shadow: none !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .mm-slip,
+  .mm-doc {
+    box-shadow: none !important;
+    padding-top: 0 !important;
+  }
+
+  @page {
+    margin: 8mm;
   }
 }
 
+/* ── modal เพิ่มสินค้า: ให้ยุบได้บนจอแคบ ──
+   เดิมใช้ inline style ที่ media query เอื้อมไม่ถึง เลยล้นบนมือถือ */
+.mm-ai-bar {
+  background: #eff6ff;
+  border: 1px dashed #60a5fa;
+  border-radius: 12px;
+  padding: 12px;
+  margin-bottom: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.mm-ai-text {
+  min-width: 0;
+  flex: 1 1 200px;
+}
+
+.mm-ai-text strong {
+  font-size: 13px;
+  color: #1e40af;
+  display: block;
+}
+
+.mm-ai-text span {
+  font-size: 11px;
+  color: #3b82f6;
+}
+
+.mm-ai-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.mm-ai-btn {
+  padding: 9px 14px;
+  border-radius: 10px;
+  border: none;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.mm-ai-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.mm-ai-cam { background: #2563eb; }
+.mm-ai-file { background: #4f46e5; }
+
+.mm-img-box {
+  background: #f8fafc;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  margin-bottom: 14px;
+}
+
+.mm-img-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #475569;
+  display: block;
+  margin-bottom: 6px;
+}
+
+.mm-img-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.mm-img-fields {
+  flex: 1 1 180px;
+  min-width: 0;
+}
+
+@media (max-width: 560px) {
+  .mm-ai-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .mm-ai-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .mm-ai-btn {
+    width: 100%;
+  }
+
+  .mm-img-row {
+    align-items: flex-start;
+  }
+
+  .mm-img-fields {
+    flex: 1 1 100%;
+  }
+
+  .mm-print-actions {
+    flex-direction: column-reverse;
+  }
+
+  .mm-print-actions .mm-btn {
+    width: 100%;
+  }
+
+  .pos-modal-actions {
+    flex-wrap: wrap;
+  }
+
+  .pos-modal-actions > * {
+    flex: 1 1 100%;
+  }
+
+  .pos-printer-bar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .pos-printer-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .mm-history-item {
+    flex-wrap: wrap;
+  }
+}
+
+/* ── ตารางสินค้า: ให้เลื่อนแนวนอนได้ทุกความกว้าง และมีเงาขอบขวาบอกว่ายังมีคอลัมน์ต่อ ──
+   เดิมตั้ง min-width ไว้เฉพาะ ≤768px ทำให้บนแท็บเล็ตตารางถูกตัดโดยไม่มีสัญญาณว่าเลื่อนได้ */
+.pos-table {
+  min-width: 720px;
+}
+
+.pos-table-wrap {
+  box-shadow:
+    0 4px 16px rgba(0, 0, 0, 0.03),
+    inset -16px 0 16px -16px rgba(15, 23, 42, 0.28);
+}
+
+/* ── โมดัลตัวอย่างรายงานประจำงวด ── */
+.mm-report-modal {
+  max-width: 900px;
+  width: 100%;
+}
+
+.mm-report-frame {
+  width: 100%;
+  min-width: 0;
+  height: 60vh;
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 14px;
+  background: #ffffff;
+}
+
+@media (max-width: 560px) {
+  .mm-report-frame {
+    height: 52vh;
+  }
+}
+
+/* อีโมจิในเอกสารที่วาดเอง ต้องมีฟอนต์อีโมจิสำรอง ไม่งั้นขึ้นเป็นกล่องว่าง */
+.mm-slip,
+.mm-doc {
+  font-family: 'Sarabun', 'Noto Sans Thai', -apple-system, BlinkMacSystemFont, sans-serif,
+    'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji';
+}
+
+/* ── QR เก็บใบเสร็จบนสลิปความร้อน ─────────────────────────────
+   🔴 QR บนกระดาษความร้อนต้องกว้างอย่างน้อย ~20 มม. ไม่งั้นกล้องมือถือ
+      จับไม่ติดเพราะหัวพิมพ์ทำโมดูลบวมเบลอ
+   🔴 image-rendering: pixelated กันเบราว์เซอร์ทำ anti-alias จนขอบโมดูลเทา
+      ซึ่งเป็นสาเหตุที่ QR พิมพ์ออกมาแล้วสแกนไม่ขึ้นบ่อยที่สุด */
+.mm-slip-qr {
+  text-align: center;
+  margin: 6px 0 2px;
+}
+
+.mm-slip-qr img {
+  width: 22mm;
+  height: 22mm;
+  display: block;
+  margin: 0 auto 3px;
+  image-rendering: pixelated;
+}
+
+.mm-tiny {
+  font-size: 8px;
+  letter-spacing: 0.5px;
+  opacity: 0.75;
+}
+
+@media print {
+  .mm-slip-qr img {
+    width: 22mm;
+    height: 22mm;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   แก้ปัญหา "สีกลืนกัน" — กฎเดียวที่ต้องจำ
+
+   🔴 กฎไหนตั้ง background เป็นสีสว่างตายตัว ต้องตั้ง color ด้วยเสมอ
+      ถ้าไม่ตั้ง ตัวอักษรจะไปหยิบสีของธีมมาใช้ ซึ่งในธีมมืดคือ #f2f5ff
+      = ขาวบนขาว หายไปทั้งปุ่ม (เคยทำให้ปุ่ม "ยกเลิก" ในโมดัล PromptPay
+      และปุ่มปิด ✕ ของโมดัลใบเสร็จ กลายเป็นกล่องขาวเปล่า)
+
+   🔴 โมดัลทุกตัวเรนเดอร์ผ่าน portal ออกไปที่ document.body ซึ่งอยู่นอก .app
+      ตัวแปรธีมสว่าง (.app:not(.dark-mode)) จึงไม่มีผลข้างในโมดัล
+      โมดัลได้โทเคนชุดมืดเสมอ แม้ผู้ใช้เลือกธีมสว่างอยู่
+      -> ข้างในโมดัล ห้ามพึ่งสีที่ถูกเฉพาะธีมสว่าง
+   ══════════════════════════════════════════════════════════════ */
+
+.pos-btn-cancel,
+.pos-icon-btn,
+.mm-ai-bar,
+.mm-img-box,
+.mm-print-scroll,
+.pos-prod-img-box {
+  color: #334155;
+}
+
+.pos-btn-cancel {
+  font-weight: 600;
+}
+
+.mm-print-close {
+  color: #475569;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* สีประจำคลัง — ต้องอ่านออกทั้งบนพื้นมืดและพื้นสว่าง
+   ของเดิมใช้ชุดเดียว (#0284c7 / #0d9488 / #7c3aed) ซึ่งบนพื้นมืดเหลือ 3.1-4.3:1 */
+:root {
+  --wh-1: #56c7f5;
+  --wh-2: #4fd6c4;
+  --wh-3: #b49cfb;
+}
+
+.app:not(.dark-mode) {
+  --wh-1: #0369a1;
+  --wh-2: #0f766e;
+  --wh-3: #6d28d9;
+}
+
+/* ปุ่มทึบที่ใช้ตัวอักษรสีขาว ต้องใช้สีแบรนด์เวอร์ชันเข้มกว่าปกติ
+   สีแบรนด์เดิม (#6d80ff ธีมมืด / #f2665f ธีมสว่าง) ขาวทับแล้วเหลือ 3.1-3.4:1
+   ซึ่งอ่านไม่ออกกลางแดด — ซึ่งคือสภาพที่แม่ค้าใช้งานจริง
+   เฉดเดียวกัน แค่ลดความสว่างลงจนผ่าน 4.5:1 */
+:root {
+  --btn-accent: #4a5ed9;
+}
+
+.app:not(.dark-mode) {
+  --btn-accent: #c8453f;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   แถบปุ่มท้ายโมดัล — เลิกลอยทับช่องกรอก
+
+   🔴 ของเดิม .pos-modal-actions เป็น position:sticky แล้วทาพื้นด้วย --bg-card
+      ซึ่งธีมมืดคือ rgba(18,28,52,.86) — โปร่งแสง ข้อความข้างใต้จึงทะลุขึ้นมา
+      เห็นชัดในโมดัล "เพิ่มสินค้า" (ปุ่มทับช่องคลัง 1) และ "ตั้งค่าเครื่องพิมพ์"
+      (ปุ่มทับช่องข้อความท้ายใบเสร็จ)
+   ══════════════════════════════════════════════════════════════ */
+:root {
+  --bg-modal-solid: #111a31;   /* rgba(18,28,52,.86) ทับบน #080f1f แล้วได้สีนี้ */
+}
+
+.app:not(.dark-mode) {
+  --bg-modal-solid: #ffffff;
+}
+
+.pos-modal-actions {
+  background: var(--bg-modal-solid);
+  padding-bottom: 2px;
+}
+
+/* ── โมดัลเพิ่ม/แก้ไขสินค้า ─────────────────────────────────
+   เนื้อหาเลื่อนในกล่องของตัวเอง แถบปุ่มอยู่นอกกล่อง จึงไม่มีทางทับกัน */
+.mm-prod-modal {
+  overflow: hidden;
+}
+
+.mm-prod-modal form {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.mm-prod-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.mm-prod-modal .pos-modal-actions {
+  position: static;
+}
+
+/* แถบ AI — แถวเดียว เงียบ ไม่แย่งสายตากับช่องกรอก */
+.mm-ai-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 8px 10px;
+  margin-bottom: 16px;
+  border: 1px solid var(--color-border-strong, #cbd5e1);
+  border-radius: 10px;
+  font-size: 12px;
+  color: var(--color-text-secondary, #475569);
+}
+
+.mm-ai-strip-btns {
+  display: flex;
+  gap: 6px;
+}
+
+.mm-ai-strip button {
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border-strong, #cbd5e1);
+  background: transparent;
+  color: var(--color-text-primary, #0f172a);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.mm-ai-strip button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* รูปสินค้า — แถวเดียว ไม่ต้องมีกรอบซ้อนกรอบ */
+.mm-img-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.mm-img-thumb {
+  width: 56px;
+  height: 56px;
+  flex-shrink: 0;
+  border-radius: 10px;
+  object-fit: cover;
+  border: 1px solid var(--color-border-strong, #cbd5e1);
+}
+
+.mm-img-thumb-empty {
+  display: grid;
+  place-items: center;
+  padding: 4px;
+  border-style: dashed;
+  font-size: 10px;
+  line-height: 1.25;
+  text-align: center;
+  color: var(--color-text-muted, #8b829f);
+}
+
+.mm-img-fields {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.mm-img-pick {
+  justify-self: start;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border-strong, #cbd5e1);
+  color: var(--color-text-primary, #0f172a);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.mm-img-fields input[type="text"] {
+  font-size: 12px;
+}
+
+/* จำนวนในคลัง — สามช่องในแถวเดียว สรุปยอดเป็นข้อความ ไม่ใช่ช่องที่กรอกไม่ได้ */
+.mm-stock {
+  border: 1px solid var(--color-border-strong, #cbd5e1);
+  border-radius: 12px;
+  padding: 6px 12px 12px;
+  margin: 2px 0 0;
+  min-width: 0;
+}
+
+.mm-stock legend {
+  padding: 0 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-secondary, #475569);
+}
+
+.mm-stock-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  /* ป้ายคลัง 2/3 มีป้าย Business ต่อท้ายจึงตกบรรทัด ทำให้ช่องกรอกไม่ตรงแถวกัน
+     จัดชิดล่างแทน ช่องกรอกทั้งสามจะอยู่ระดับเดียวกันเสมอ */
+  align-items: end;
+}
+
+.mm-stock-grid .pos-field {
+  margin-bottom: 0;
+  min-width: 0;
+}
+
+.mm-stock-grid label {
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.mm-stock input:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.mm-lock {
+  display: inline-block;
+  margin-left: 3px;
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: var(--color-warning-soft, rgba(198, 127, 20, 0.1));
+  color: var(--color-warning, #c67f14);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  vertical-align: middle;
+}
+
+.mm-stock-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--color-divider, #e2e8f0);
+  font-size: 12px;
+  color: var(--color-text-secondary, #475569);
+}
+
+.mm-stock-total strong {
+  font-size: 16px;
+  color: var(--color-text-primary, #0f172a);
+}
+
+.mm-stock-min {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-secondary, #475569);
+}
+
+.mm-stock-min input {
+  width: 76px;
+}
+
+@media (max-width: 520px) {
+  .mm-prod-modal {
+    padding: 18px 16px;
+  }
+
+  .mm-ai-strip {
+    justify-content: flex-start;
+  }
+
+  .mm-stock-grid {
+    gap: 7px;
+  }
+
+  .mm-stock-min input {
+    width: 64px;
+  }
+}
+
+/* ปุ่มรองไม่ควรเด่นกว่าปุ่มหลัก
+   ของเดิม "ยกเลิก" เป็นเม็ดสีขาวสว่างบนโมดัลพื้นเข้ม จึงดึงสายตามากกว่าปุ่มบันทึก */
+.pos-btn-cancel {
+  background: transparent;
+  border: 1px solid var(--color-border-strong, #cbd5e1);
+  color: var(--color-text-secondary, #475569);
+  font-weight: 600;
+}
+
+/* บนมือถือ ช่องสั้น ๆ ยังควรอยู่คู่กัน ไม่ต้องยืดเต็มบรรทัดทีละช่อง
+   ของเดิมพับเป็นคอลัมน์เดียวที่ 768px ทำให้ฟอร์มยาวจนต้องเลื่อนหลายหน้าจอ */
+@media (max-width: 768px) {
+  .mm-prod-modal .pos-field-row {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 560px) {
+  .mm-prod-modal .pos-modal-actions {
+    flex-wrap: nowrap;
+  }
+
+  .mm-prod-modal .pos-modal-actions > * {
+    flex: 0 0 auto;
+  }
+
+  .mm-prod-modal .pos-btn-submit {
+    flex: 1 1 auto;
+  }
+}
+
+/* ── กล่องเครื่องพิมพ์บลูทูธในโมดัลตั้งค่า ── */
+.mm-bt {
+  border: 1px solid var(--color-border-strong, #cbd5e1);
+  border-radius: 12px;
+  padding: 12px;
+  margin-bottom: 14px;
+}
+
+.mm-bt-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.mm-bt-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text-primary, #0f172a);
+}
+
+/* จุดสถานะ — เทา = ยังไม่ต่อ, เขียว = ต่ออยู่ */
+.mm-bt-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-text-muted, #8b829f);
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.mm-bt-dot.on {
+  background: var(--color-success, #0d9668);
+}
+
+.mm-bt-state {
+  font-size: 12px;
+  color: var(--color-text-secondary, #475569);
+}
+
+.mm-bt-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.mm-bt-busy {
+  font-size: 12px;
+  color: var(--color-text-secondary, #475569);
+  font-variant-numeric: tabular-nums;
+}
+
+.mm-bt-note {
+  margin: 10px 0 0;
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--color-text-secondary, #475569);
+}
+
+.mm-bt-note strong {
+  color: var(--color-text-primary, #0f172a);
+}

@@ -1,13 +1,72 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { Capacitor } from '@capacitor/core';
 import { Camera, CameraSource } from '@capacitor/camera';
 import { canAccess } from '../SubscriptionContext/SubscriptionService';
-import { exportInventoryPOSReport } from '../utils/dataTransfer';
+import { exportInventoryPOSReport, buildInventoryPOSReportHtml } from '../utils/dataTransfer';
 import { scanProductImageWithAI } from '../services/GeminiService';
 import { generateDocumentJpgDataUrl, shareOrDownloadJpg } from '../utils/documentJpgExporter';
+import { deductStockFromWarehouses } from '../utils/stockMath';
+import AIConsentService from '../services/AIConsentService';
+import AIConsentModal from '../components/AIConsentModal';
+import { qrSvgDataUrl } from '../utils/qrGen';
+import { issueShareToken, buildReceiptUrl, recordReceipt, syncPendingReceipts } from '../services/ReceiptLoopService';
+import * as BtPrinter from '../services/BluetoothPrinter';
+import { renderSlipToCanvas, renderTestSlipToCanvas } from '../utils/thermalRender';
+import { buildReceiptJob } from '../utils/escpos';
 import './InventoryPOS.css';
 
 const INVENTORY_STORAGE_KEY = 'moneyma_inventory_products';
+const PRINTER_SETTINGS_KEY = 'moneyma_printer_settings';
+
+export const DEFAULT_PRINTER_SETTINGS = {
+  paperWidth: '80',        // '58' | '80' (มม.)
+  shopName: 'MoneyMa Store',
+  shopAddress: '',
+  shopTaxId: '',
+  headerNote: '',
+  footerNote: 'ขอบคุณที่ใช้บริการ',
+};
+
+/**
+ * 🔴 WebView ของ Android ไม่ได้ implement window.print() -> กดแล้วเงียบ
+ *    บน Android จึงไม่โชว์ปุ่มพิมพ์ แต่ให้ "บันทึกเป็นรูปภาพ / แชร์" แทน
+ *    ซึ่งผู้ใช้เอาไปเข้าแอปเครื่องพิมพ์หรือส่งต่อทาง LINE ได้เอง
+ *    (iOS/WKWebView รองรับ window.print() และเด้ง AirPrint ให้ จึงคงไว้เหมือนเดิม)
+ */
+/**
+ * 🔴 .pos-modal-backdrop เป็น position:fixed ก็จริง แต่ถ้ามีบรรพบุรุษตัวไหน
+ *    ตั้ง transform / filter / backdrop-filter ไว้ ตัวนั้นจะกลายเป็น containing block
+ *    ทำให้ overlay คลุมแค่พื้นที่เนื้อหา ไม่คลุมแถบเมนูด้านซ้าย -> โมดัลทับกับเมนู
+ *    แก้ด้วยการ render ผ่าน portal ออกไปที่ document.body ตรง ๆ
+ */
+function ModalPortal({ children }) {
+  if (typeof document === 'undefined') return children;
+  return createPortal(children, document.body);
+}
+
+const IS_ANDROID = Capacitor.getPlatform() === 'android';
+const CAN_SYSTEM_PRINT = !IS_ANDROID;
+
+const DOC_HISTORY_LIMIT = 200;
+
+/** อ่านทะเบียนเอกสารจากเครื่อง */
+export function readDocHistory(key) {
+  try {
+    const raw = JSON.parse(localStorage.getItem(key) || '[]');
+    return Array.isArray(raw) ? raw : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+/** บันทึกเอกสารลงทะเบียน (ใหม่สุดอยู่บน, เก็บไม่เกิน DOC_HISTORY_LIMIT ใบ) */
+export function saveDocHistory(key, record) {
+  try {
+    const list = readDocHistory(key);
+    localStorage.setItem(key, JSON.stringify([record, ...list].slice(0, DOC_HISTORY_LIMIT)));
+  } catch (e) {}
+}
 
 export default function InventoryPOS({ userPlan = 'free', onAddTransaction, openPaywall, t = {} }) {
   const hasAccess = canAccess(userPlan, 'stock_management');
@@ -16,7 +75,10 @@ export default function InventoryPOS({ userPlan = 'free', onAddTransaction, open
   const cameraInputRef = useRef(null);
   const fileInputRef = useRef(null);
   const [isScanningAi, setIsScanningAi] = useState(false);
+  const [showAIConsent, setShowAIConsent] = useState(false);
+  const [pendingAction, setPendingAction] = useState(null);
 
+  const [historyTick, setHistoryTick] = useState(0);
   const [activeTab, setActiveTab] = useState('inventory'); // 'inventory' | 'pos' | 'po' | 'report'
   const [products, setProducts] = useState(() => {
     try {
@@ -47,6 +109,23 @@ export default function InventoryPOS({ userPlan = 'free', onAddTransaction, open
   useEffect(() => {
     localStorage.setItem('moneyma_auto_print_receipt', JSON.stringify(autoPrintReceipt));
   }, [autoPrintReceipt]);
+
+  // ── ตั้งค่าเครื่องพิมพ์ (ความกว้างกระดาษ / หัว-ท้ายใบเสร็จ) ──
+  const [printerSettings, setPrinterSettings] = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(PRINTER_SETTINGS_KEY) || 'null');
+      return saved ? { ...DEFAULT_PRINTER_SETTINGS, ...saved } : DEFAULT_PRINTER_SETTINGS;
+    } catch (e) {
+      return DEFAULT_PRINTER_SETTINGS;
+    }
+  });
+  const [showPrinterSettings, setShowPrinterSettings] = useState(false);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(PRINTER_SETTINGS_KEY, JSON.stringify(printerSettings));
+    } catch (e) {}
+  }, [printerSettings]);
 
   // Modal State for Product CRUD & Multi-Warehouse
   const [showProductModal, setShowProductModal] = useState(false);
@@ -145,28 +224,42 @@ export default function InventoryPOS({ userPlan = 'free', onAddTransaction, open
   // Daily Sales & PO Counters for Today
   const todayStr = new Date().toISOString().split('T')[0];
 
-  const todaySalesCount = React.useMemo(() => {
-    try {
-      const history = JSON.parse(localStorage.getItem('moneyma_sales_history') || '[]');
-      return history.filter(item => item.date === todayStr).length;
-    } catch (e) {
-      return 0;
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cart, activeTab, todayStr]);
+  const todaySalesCount = React.useMemo(
+    () => readDocHistory('moneyma_sales_history').filter(item => item.date === todayStr).length,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [cart, activeTab, todayStr, historyTick]
+  );
 
-  const todayPoCount = React.useMemo(() => {
-    try {
-      const history = JSON.parse(localStorage.getItem('moneyma_po_history') || '[]');
-      return history.filter(item => item.date === todayStr).length;
-    } catch (e) {
-      return 0;
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [poItems, activeTab, todayStr]);
+  const todayPoCount = React.useMemo(
+    () => readDocHistory('moneyma_po_history').filter(item => item.date === todayStr).length,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [poItems, activeTab, todayStr, historyTick]
+  );
 
   // Target warehouse for Purchase Orders
   const [poTargetWarehouse, setPoTargetWarehouse] = useState('warehouse1'); // 'warehouse1' | 'warehouse2' | 'warehouse3'
+
+  const executeWithConsent = useCallback((action) => {
+    if (AIConsentService.hasConsent()) {
+      action();
+    } else {
+      setPendingAction(() => action);
+      setShowAIConsent(true);
+    }
+  }, []);
+
+  const handleConsentAccept = useCallback(() => {
+    setShowAIConsent(false);
+    if (pendingAction) {
+      pendingAction();
+      setPendingAction(null);
+    }
+  }, [pendingAction]);
+
+  const handleConsentDecline = useCallback(() => {
+    setShowAIConsent(false);
+    setPendingAction(null);
+  }, []);
 
   // AI Image Scan Helper
   const processAiScanFile = async (file) => {
@@ -195,55 +288,57 @@ export default function InventoryPOS({ userPlan = 'free', onAddTransaction, open
   };
 
   // 📷 AI Camera Scan (Native device camera or direct camera capture)
-  const handleAiScanCamera = async () => {
-    if (Capacitor.isNativePlatform()) {
-      try {
-        const photo = await Camera.getPhoto({
-          quality: 90,
-          allowEditing: false,
-          resultType: 'base64',
-          source: CameraSource.Camera,
-        });
+  const handleAiScanCamera = () => {
+    executeWithConsent(async () => {
+      if (Capacitor.isNativePlatform()) {
+        try {
+          const photo = await Camera.getPhoto({
+            quality: 90,
+            allowEditing: false,
+            resultType: 'base64',
+            source: CameraSource.Camera,
+          });
 
-        if (!photo?.base64String) return;
+          if (!photo?.base64String) return;
 
-        const byteChars = atob(photo.base64String);
-        const byteArr = new Uint8Array(byteChars.length);
-        for (let i = 0; i < byteChars.length; i++) {
-          byteArr[i] = byteChars.charCodeAt(i);
+          const byteChars = atob(photo.base64String);
+          const byteArr = new Uint8Array(byteChars.length);
+          for (let i = 0; i < byteChars.length; i++) {
+            byteArr[i] = byteChars.charCodeAt(i);
+          }
+          const blob = new Blob([byteArr], { type: 'image/jpeg' });
+          const file = new File([blob], 'camera_product.jpg', { type: 'image/jpeg' });
+
+          await processAiScanFile(file);
+        } catch (err) {
+          if (!err.message?.includes('cancelled') && !err.message?.includes('cancel')) {
+            console.error('Camera error:', err);
+            alert('❌ ไม่สามารถเปิดกล้องได้ กรุณาลองใหม่อีกครั้ง');
+          }
         }
-        const blob = new Blob([byteArr], { type: 'image/jpeg' });
-        const file = new File([blob], 'camera_product.jpg', { type: 'image/jpeg' });
-
-        await processAiScanFile(file);
-      } catch (err) {
-        if (!err.message?.includes('cancelled') && !err.message?.includes('cancel')) {
-          console.error('Camera error:', err);
-          alert('❌ ไม่สามารถเปิดกล้องได้ กรุณาลองใหม่อีกครั้ง');
-        }
-      }
-    } else {
-      if (cameraInputRef.current) {
-        cameraInputRef.current.click();
       } else {
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.accept = 'image/*';
-        input.capture = 'environment';
-        input.onchange = async (e) => {
-          const file = e.target.files?.[0];
-          if (file) await processAiScanFile(file);
-        };
-        input.click();
+        if (cameraInputRef.current) {
+          cameraInputRef.current.click();
+        } else {
+          const input = document.createElement('input');
+          input.type = 'file';
+          input.accept = 'image/*';
+          input.capture = 'environment';
+          input.onchange = async (e) => {
+            const file = e.target.files?.[0];
+            if (file) await processAiScanFile(file);
+          };
+          input.click();
+        }
       }
-    }
+    });
   };
 
   // 📁 AI File Scan (Keep original file input picker)
-  const handleAiScanFileChange = async (e) => {
+  const handleAiScanFileChange = (e) => {
     const file = e.target.files?.[0];
     if (file) {
-      await processAiScanFile(file);
+      executeWithConsent(() => processAiScanFile(file));
     }
     e.target.value = '';
   };
@@ -367,201 +462,303 @@ export default function InventoryPOS({ userPlan = 'free', onAddTransaction, open
   const vatAmount = (discountedCart * vatPercent) / 100;
   const totalCartAmount = discountedCart + vatAmount;
 
-  // Complete POS Sale
-  const handleCompleteSale = () => {
-    if (cart.length === 0) return;
+  // ────────────────────────────────────────────────────────────────
+  //  ระบบเอกสาร & การพิมพ์
+  //  🔴 ห้ามใช้ window.open() + document.write() เพื่อพิมพ์อีก
+  //     WKWebView ของ Capacitor ไม่คืนหน้าต่างที่เขียนทับได้ -> เงียบ ไม่มีอะไรขึ้น
+  //     ใช้วิธีวาดเอกสารลง #moneyma-print-area ในหน้าเดิม แล้วเรียก window.print()
+  //     ซึ่ง iOS จะเด้งแผง AirPrint ให้เอง
+  // ────────────────────────────────────────────────────────────────
+  // ใบเสร็จที่ออกตอนเน็ตร้านหลุด ค้างอยู่ในเครื่อง — ส่งขึ้นตอนเปิดหน้า POS
+  useEffect(() => { syncPendingReceipts(); }, []);
 
-    // 1. Deduct stock from products
-    setProducts(prev => prev.map(prod => {
-      const cartItem = cart.find(c => c.id === prod.id);
-      if (cartItem) {
-        return { ...prod, stock: Math.max(0, prod.stock - cartItem.qty) };
+  const [printDoc, setPrintDoc] = useState(null);
+  const saveDocAsImageRef = useRef(null);
+  const [reportHtml, setReportHtml] = useState('');
+  const reportFrameRef = useRef(null);
+
+  // ── เครื่องพิมพ์สลิปบลูทูธ (BLE) ──
+  const [btName, setBtName] = useState(() => BtPrinter.lastDeviceName());
+  const [btConnected, setBtConnected] = useState(false);
+  const [btBusy, setBtBusy] = useState('');
+  const btPrintRef = useRef(null);
+  const btSupport = BtPrinter.support();
+
+  const handleBtConnect = async () => {
+    setBtBusy('กำลังค้นหาเครื่องพิมพ์…');
+    try {
+      const dev = await BtPrinter.connect();
+      setBtName(dev.name || 'เครื่องพิมพ์');
+      setBtConnected(true);
+    } catch (e) {
+      setBtConnected(false);
+      // ผู้ใช้กดยกเลิกหน้าต่างเลือกอุปกรณ์ ไม่ใช่ข้อผิดพลาด ไม่ต้องเด้งเตือน
+      if (e?.name !== 'NotFoundError') {
+        alert('ต่อเครื่องพิมพ์ไม่สำเร็จ\n\n' + (e?.message || e));
       }
-      return prod;
+    } finally {
+      setBtBusy('');
+    }
+  };
+
+  const handleBtDisconnect = () => {
+    BtPrinter.disconnect();
+    setBtConnected(false);
+  };
+
+  // 🔴 วาดใบเสร็จใหม่ตามจำนวนจุดจริงของหัวพิมพ์ ไม่ได้แคปหน้าจอ HTML
+  //    เพราะกระดาษความร้อนมีแค่ดำกับขาว ถ้าย่อ/ขยายภาพ ตัวอักษรจะเบลอ
+  //    และ QR จะสแกนไม่ติด
+  const printViaBluetooth = async (docArg) => {
+    const d = docArg || printDoc;
+    if (!d) return;
+    setBtBusy('กำลังเตรียมใบเสร็จ…');
+    try {
+      const canvas = d.kind === 'test'
+        ? await renderTestSlipToCanvas(printerSettings)
+        : await renderSlipToCanvas(d, printerSettings);
+      const bytes = buildReceiptJob(canvas, { cut: true });
+      await BtPrinter.write(bytes, {
+        onProgress: (sent, total) => setBtBusy(`กำลังส่ง ${Math.round((sent / total) * 100)}%`),
+      });
+      setBtBusy('');
+    } catch (e) {
+      setBtBusy('');
+      setBtConnected(BtPrinter.isConnected());
+      alert('พิมพ์ไม่สำเร็จ\n\n' + (e?.message || e));
+    }
+  };
+  btPrintRef.current = printViaBluetooth;
+
+  const doPrint = useCallback(() => {
+    // ต่อเครื่องพิมพ์บลูทูธไว้ = ส่งไปเครื่องนั้นเสมอ ไม่ต้องผ่านระบบพิมพ์ของเครื่อง
+    if (BtPrinter.isConnected() && btPrintRef.current) {
+      btPrintRef.current();
+      return;
+    }
+    if (!CAN_SYSTEM_PRINT) {
+      // Android: ไม่มีระบบพิมพ์ใน WebView -> ส่งต่อไปทางบันทึกรูปภาพ
+      saveDocAsImageRef.current?.();
+      return;
+    }
+    // รอให้ React วาดเอกสารลง DOM ให้เสร็จก่อนสั่งพิมพ์
+    setTimeout(() => {
+      try {
+        window.print();
+      } catch (e) {
+        alert('❌ เปิดหน้าต่างพิมพ์ไม่สำเร็จ: ' + (e?.message || e));
+      }
+    }, 250);
+  }, []);
+
+  // token ต้องเกิดตอน "สร้างเอกสาร" ไม่ใช่ตอน "พิมพ์"
+  // ถ้าสร้างตอนพิมพ์ ใบที่เห็นในพรีวิวกับใบที่พิมพ์ออกมาจะคนละรหัส
+  // แล้ว scan ที่เข้ามาจะจับคู่กับใบเสร็จไม่ได้เลย
+  const buildSaleDoc = (kind, token = kind === 'receipt' ? issueShareToken() : null) => ({
+    kind,
+    docNo: kind === 'so' ? `SO-${Date.now().toString().slice(-6)}` : `RC-${Date.now().toString().slice(-6)}`,
+    dateText: new Date().toLocaleString('th-TH'),
+    dateIso: new Date().toISOString().split('T')[0],
+    customerName,
+    customerTaxId,
+    items: cart.map(it => ({ id: it.id, sku: it.sku, name: it.name, qty: it.qty, price: it.price })),
+    subtotal: subtotalCart,
+    discount,
+    vatPercent,
+    vatAmount,
+    total: totalCartAmount,
+    promptPayId,
+    shareToken: token,
+    shareUrl: token ? buildReceiptUrl(token) : '',
+    committed: false,
+  });
+
+  // เปิดพรีวิวใบเสร็จก่อน — ยังไม่ตัดสต็อก ยังไม่บันทึกเงิน
+  const openReceiptPreview = () => {
+    if (cart.length === 0) return;
+    setPrintDoc(buildSaleDoc('receipt'));
+  };
+
+  // ยืนยันแล้วค่อยตัดสต็อก + บันทึกรายรับ + เก็บเข้าทะเบียนเอกสาร
+  const commitSale = (alsoPrint) => {
+    const doc = printDoc;
+    if (!doc || doc.committed) {
+      if (alsoPrint) doPrint();
+      return;
+    }
+
+    setProducts(prev => prev.map(prod => {
+      const line = doc.items.find(c => c.id === prod.id);
+      if (!line) return prod;
+      return deductStockFromWarehouses(prod, Number(line.qty) || 0);
     }));
 
-    // 2. Add Income transaction to financial system
-    const description = `ขายสินค้า (POS): ${cart.map(c => `${c.name} x${c.qty}`).join(', ')}`;
+    const description = `ขายสินค้า (POS): ${doc.items.map(c => `${c.name} x${c.qty}`).join(', ')}`;
     if (typeof onAddTransaction === 'function') {
       onAddTransaction({
         type: 'income',
-        amount: totalCartAmount,
+        amount: doc.total,
         category: 'ขายสินค้า/บริการ',
         description,
-        date: new Date().toISOString().split('T')[0],
+        date: doc.dateIso,
       });
     }
 
-    // Save sales record history for daily counter
-    try {
-      const saleRecord = {
-        id: `POS-${Date.now()}`,
-        date: new Date().toISOString().split('T')[0],
-        customerName,
-        customerTaxId,
-        items: cart,
-        totalAmount: totalCartAmount,
-      };
-      const existingSalesHistory = JSON.parse(localStorage.getItem('moneyma_sales_history') || '[]');
-      localStorage.setItem('moneyma_sales_history', JSON.stringify([saleRecord, ...existingSalesHistory]));
-    } catch (e) {}
+    saveDocHistory('moneyma_sales_history', {
+      id: doc.docNo,
+      docType: 'receipt',
+      date: doc.dateIso,
+      dateText: doc.dateText,
+      customerName: doc.customerName,
+      customerTaxId: doc.customerTaxId,
+      items: doc.items,
+      subtotal: doc.subtotal,
+      discount: doc.discount,
+      vatPercent: doc.vatPercent,
+      vatAmount: doc.vatAmount,
+      totalAmount: doc.total,
+      shareToken: doc.shareToken,
+      shareUrl: doc.shareUrl,
+    });
 
-    // 3. Print Tax Invoice / Receipt if autoPrintReceipt enabled
-    if (autoPrintReceipt) {
-      const printWindow = window.open('', '_blank');
-      if (printWindow) {
-        printWindow.document.write(`
-          <!DOCTYPE html>
-          <html>
-          <head>
-            <title>ใบเสร็จรับเงิน / ใบกำกับภาษีอย่างย่อ</title>
-            <style>
-              body { font-family: monospace; padding: 20px; width: 300px; margin: 0 auto; line-height: 1.4; }
-              h2, h3 { text-align: center; margin: 5px 0; }
-              .line { border-bottom: 1px dashed #000; margin: 10px 0; }
-              .row { display: flex; justify-content: space-between; }
-            </style>
-          </head>
-          <body>
-            <h2>MoneyMa Store</h2>
-            <h3>ใบเสร็จรับเงิน / ใบกำกับภาษีอย่างย่อ</h3>
-            <div class="line"></div>
-            <div>ลูกค้า: ${customerName}</div>
-            ${customerTaxId ? `<div>Tax ID: ${customerTaxId}</div>` : ''}
-            <div>วันที่: ${new Date().toLocaleString('th-TH')}</div>
-            <div class="line"></div>
-            ${cart.map(item => `
-              <div class="row">
-                <span>${item.name} x${item.qty}</span>
-                <span>฿${(item.price * item.qty).toLocaleString()}</span>
-              </div>
-            `).join('')}
-            <div class="line"></div>
-            <div class="row"><span>ยอดรวมสินค้า:</span><span>฿${subtotalCart.toLocaleString()}</span></div>
-            ${discount > 0 ? `<div class="row"><span>ส่วนลด:</span><span>-฿${discount.toLocaleString()}</span></div>` : ''}
-            <div class="row"><span>VAT ${vatPercent}%:</span><span>฿${vatAmount.toLocaleString()}</span></div>
-            <div class="row" style="font-weight:bold; font-size: 16px;"><span>สุทธิ:</span><span>฿${totalCartAmount.toLocaleString()}</span></div>
-            <div class="line"></div>
-            <p style="text-align:center;">ขอบคุณที่ใชับริการ!</p>
-          </body>
-          </html>
-        `);
-        printWindow.document.close();
-        printWindow.focus();
-        setTimeout(() => printWindow.print(), 300);
-      }
+    // ขาบันทึกของ growth loop — fire-and-forget โดยเจตนา
+    // ห้าม await ตรงนี้ ถ้า Supabase ช้า การขายต้องไม่ค้างตาม
+    if (doc.shareToken) {
+      recordReceipt({
+        token: doc.shareToken,
+        docNo: doc.docNo,
+        total: doc.total,
+        itemCount: (doc.items || []).length,
+      });
     }
 
-    alert('🎉 บันทึกการขาย ตัดสต็อก และสร้างรายการรายรับสำเร็จ!');
     setCart([]);
+    setDiscount(0);
+    setHistoryTick(t => t + 1);
+    setPrintDoc(prev => (prev ? { ...prev, committed: true } : prev));
+
+    if (alsoPrint) doPrint();
   };
 
   // QR PromptPay Payment Confirmation
   const handleConfirmQrPayment = () => {
     setShowQrModal(false);
-    handleCompleteSale();
+    openReceiptPreview();
   };
 
-  // Generate Sales Order / Quotaion / Draft Invoice
+  // ใบสั่งขาย (SO) — เอกสารเสนอราคา/สั่งขาย ยังไม่ตัดสต็อก
   const handleGenerateSalesOrder = () => {
     if (cart.length === 0) {
-      alert('⚠️ กรุณาเลือกสินค้าลงตะกร้าก่อนออกใบสั่งซื้อ!');
+      alert('⚠️ กรุณาเลือกสินค้าลงตะกร้าก่อนออกใบสั่งขาย!');
       return;
     }
-    const orderNo = `SO-${Date.now().toString().slice(-6)}`;
-    const qrUrl = `https://promptpay.io/${promptPayId.replace(/[^0-9]/g, '')}/${totalCartAmount.toFixed(2)}.png`;
-
-    const printWindow = window.open('', '_blank');
-    if (printWindow) {
-      printWindow.document.write(`
-        <!DOCTYPE html>
-        <html lang="th">
-        <head>
-          <meta charset="UTF-8">
-          <title>ใบสั่งซื้อ / ใบสั่งขาย (Sales Order) #${orderNo}</title>
-          <style>
-            @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap');
-            body { font-family: 'Sarabun', sans-serif; padding: 30px; margin: 0; color: #0f172a; line-height: 1.5; }
-            .header { display: flex; justify-content: space-between; border-bottom: 2px solid #6366f1; padding-bottom: 15px; margin-bottom: 20px; }
-            .header h1 { margin: 0; color: #4338ca; font-size: 22px; }
-            .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; font-size: 13px; }
-            table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 13px; }
-            th { background: #4338ca; color: #fff; text-align: left; padding: 8px 12px; }
-            td { border-bottom: 1px solid #e2e8f0; padding: 8px 12px; }
-            .text-right { text-align: right; }
-            .summary { text-align: right; font-size: 14px; margin-bottom: 30px; }
-            .qr-section { text-align: center; background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 12px; padding: 16px; width: 220px; margin: 0 auto; }
-            .qr-section img { width: 140px; height: 140px; }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <div>
-              <h1>MoneyMa Store — ใบสั่งซื้อ / ใบสั่งขาย (Sales Order)</h1>
-              <p style="margin:4px 0 0 0; font-size:12px; color:#64748b;">เอกสารใบสั่งซื้อสำหรับการสั่งซื้อและชำระเงิน</p>
-            </div>
-            <div style="text-align:right;">
-              <h2 style="margin:0; font-size:16px;">เลขที่: ${orderNo}</h2>
-              <p style="margin:4px 0 0 0; font-size:12px; color:#64748b;">วันที่: ${new Date().toLocaleDateString('th-TH')}</p>
-            </div>
-          </div>
-
-          <div class="info-grid">
-            <div>
-              <strong>ข้อมูลผู้ซื้อ (Customer):</strong>
-              <div>ชื่อ: ${customerName}</div>
-              ${customerTaxId ? `<div>Tax ID: ${customerTaxId}</div>` : ''}
-            </div>
-            <div style="text-align:right;">
-              <strong>วิธีการชำระเงิน (Payment Method):</strong>
-              <div>PromptPay QR / โอนเงินผ่านธนาคาร</div>
-              <div>พร้อมเพย์: ${promptPayId}</div>
-            </div>
-          </div>
-
-          <table>
-            <thead>
-              <tr>
-                <th>SKU</th>
-                <th>รายการสินค้า</th>
-                <th class="text-right">จำนวน</th>
-                <th class="text-right">ราคา/หน่วย</th>
-                <th class="text-right">รวมเงิน</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${cart.map(item => `
-                <tr>
-                  <td><code>${item.sku}</code></td>
-                  <td><b>${item.name}</b></td>
-                  <td class="text-right">${item.qty}</td>
-                  <td class="text-right">฿${item.price.toLocaleString()}</td>
-                  <td class="text-right">฿${(item.price * item.qty).toLocaleString()}</td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-
-          <div class="summary">
-            <div>ยอดรวมสินค้า: ฿${subtotalCart.toLocaleString()}</div>
-            ${discount > 0 ? `<div>ส่วนลด: -฿${discount.toLocaleString()}</div>` : ''}
-            <div>VAT ${vatPercent}%: ฿${vatAmount.toLocaleString()}</div>
-            <h3 style="margin:8px 0; color:#4338ca;">ยอดชำระสุทธิ: ฿${totalCartAmount.toLocaleString()}</h3>
-          </div>
-
-          <div class="qr-section">
-            <h4 style="margin:0 0 8px 0; font-size:13px; color:#4338ca;">📲 สแกน QR Code ชำระเงิน</h4>
-            <img src="${qrUrl}" alt="PromptPay QR" />
-            <p style="margin:6px 0 0 0; font-size:11px; color:#64748b;">พร้อมเพย์: ${promptPayId}</p>
-          </div>
-        </body>
-        </html>
-      `);
-      printWindow.document.close();
-      printWindow.focus();
-      setTimeout(() => printWindow.print(), 300);
-    }
+    const doc = buildSaleDoc('so');
+    saveDocHistory('moneyma_so_history', {
+      id: doc.docNo,
+      docType: 'so',
+      date: doc.dateIso,
+      dateText: doc.dateText,
+      customerName: doc.customerName,
+      customerTaxId: doc.customerTaxId,
+      items: doc.items,
+      subtotal: doc.subtotal,
+      discount: doc.discount,
+      vatPercent: doc.vatPercent,
+      vatAmount: doc.vatAmount,
+      totalAmount: doc.total,
+    });
+    setHistoryTick(t => t + 1);
+    setPrintDoc(doc);
   };
+
+  const handlePrintPo = () => {
+    if (poItems.length === 0) {
+      alert('⚠️ กรุณาเลือกสินค้าในใบสั่งซื้อก่อนออกเอกสาร!');
+      return;
+    }
+    const whLabel = poTargetWarehouse === 'warehouse2' ? 'คลัง 2 (หน้าร้าน)' : poTargetWarehouse === 'warehouse3' ? 'คลัง 3 (สำรอง)' : 'คลัง 1 (คลังหลัก)';
+    setPrintDoc({
+      kind: 'po',
+      docNo: `PO-${Date.now().toString().slice(-6)}`,
+      dateText: new Date().toLocaleString('th-TH'),
+      supplierName,
+      supplierTaxId,
+      warehouseLabel: whLabel,
+      items: poItems.map(it => ({ id: it.id, sku: it.sku, name: it.name, qty: it.qty, purchaseCost: it.purchaseCost })),
+      subtotal: subtotalPo,
+      total: subtotalPo,
+      committed: true,
+    });
+  };
+
+  const handleTestPrint = () => {
+    setPrintDoc({ kind: 'test', docNo: 'TEST', dateText: new Date().toLocaleString('th-TH'), items: [], committed: true });
+  };
+
+  // เปิดเอกสารเก่าจากทะเบียนขึ้นมาดู/พิมพ์ซ้ำ
+  const openHistoryDoc = (rec, kind) => {
+    setPrintDoc({
+      kind,
+      docNo: rec.id,
+      dateText: rec.dateText || rec.date,
+      dateIso: rec.date,
+      customerName: rec.customerName,
+      customerTaxId: rec.customerTaxId,
+      supplierName: rec.supplierName,
+      supplierTaxId: rec.supplierTaxId,
+      warehouseLabel: rec.targetWarehouse,
+      items: rec.items || [],
+      subtotal: rec.subtotal !== undefined ? rec.subtotal : rec.totalAmount,
+      discount: rec.discount || 0,
+      vatPercent: rec.vatPercent || 0,
+      vatAmount: rec.vatAmount || 0,
+      total: rec.totalAmount,
+      promptPayId,
+      // พิมพ์ซ้ำต้องได้รหัสเดิม ไม่งั้นใบเดียวจะนับเป็นสองใบในสถิติ
+      shareToken: rec.shareToken || '',
+      shareUrl: rec.shareUrl || (rec.shareToken ? buildReceiptUrl(rec.shareToken) : ''),
+      committed: true,
+      fromHistory: true,
+    });
+  };
+
+  // เปลี่ยนเอกสารที่กำลังพรีวิวให้เป็นรูปภาพ แล้วเปิดแผงบันทึก/แชร์
+  const handleSaveDocAsImage = async () => {
+    const d = printDoc;
+    if (!d || d.kind === 'test') return;
+
+    const ps = printerSettings;
+    const dataUrl = await generateDocumentJpgDataUrl({
+      type: d.kind === 'po' ? 'po' : d.kind === 'receipt' ? 'receipt' : 'so',
+      orderNo: d.docNo,
+      date: d.dateText,
+      customerName: d.customerName,
+      supplierName: d.supplierName,
+      taxId: d.kind === 'po' ? d.supplierTaxId : d.customerTaxId,
+      warehouseLabel: d.warehouseLabel,
+      items: d.items,
+      subtotal: d.subtotal,
+      discount: d.discount,
+      vatPercent: d.vatPercent,
+      vatAmount: d.vatAmount,
+      totalAmount: d.total,
+      promptPayId: d.kind === 'so' ? d.promptPayId : '',
+      shareUrl: d.shareUrl,
+      shareToken: d.shareToken,
+      shopName: ps.shopName,
+      shopAddress: ps.shopAddress,
+      shopTaxId: ps.shopTaxId,
+      footerNote: ps.footerNote,
+    });
+
+    const prefix = d.kind === 'po' ? 'PurchaseOrder' : d.kind === 'receipt' ? 'Receipt' : 'SalesOrder';
+    setJpgDataUrl(dataUrl);
+    setJpgFileName(`${prefix}_${d.docNo}.jpg`);
+    setPrintDoc(null);       // ปิดพรีวิวก่อน ไม่งั้นแผงรูปจะอยู่ใต้มัน
+    setShowJpgModal(true);
+  };
+
+  saveDocAsImageRef.current = handleSaveDocAsImage;
 
   const handleExportSalesOrderJpg = async () => {
     if (cart.length === 0) {
@@ -588,6 +785,21 @@ export default function InventoryPOS({ userPlan = 'free', onAddTransaction, open
     setShowJpgModal(true);
   };
 
+  const [isSharingJpg, setIsSharingJpg] = useState(false);
+
+  const handleShareJpg = async () => {
+    if (!jpgDataUrl) return;
+    setIsSharingJpg(true);
+    try {
+      const res = await shareOrDownloadJpg(jpgDataUrl, jpgFileName);
+      if (res && res.ok === false && !res.cancelled) {
+        alert('❌ บันทึก/แชร์รูปภาพไม่สำเร็จ\n' + (res.error || 'ไม่ทราบสาเหตุ'));
+      }
+    } finally {
+      setIsSharingJpg(false);
+    }
+  };
+
   const handleExportPoJpg = async () => {
     if (poItems.length === 0) {
       alert('⚠️ กรุณาเลือกสินค้าในใบสั่งซื้อก่อนออกเอกสารรูปภาพ!');
@@ -609,31 +821,6 @@ export default function InventoryPOS({ userPlan = 'free', onAddTransaction, open
     setJpgDataUrl(dataUrl);
     setJpgFileName(`PurchaseOrder_${orderNo}.jpg`);
     setShowJpgModal(true);
-  };
-
-  const handleTestPrinter = () => {
-    const printWindow = window.open('', '_blank');
-    if (printWindow) {
-      printWindow.document.write(`
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <title>ทดสอบเครื่องพิมพ์ (Test Print)</title>
-          <style>body { font-family: monospace; padding: 20px; width: 280px; text-align: center; }</style>
-        </head>
-        <body>
-          <h2>MoneyMa POS</h2>
-          <hr />
-          <p>✅ เครื่องพิมพ์พร้อมใช้งาน!</p>
-          <p>Printer Status: ONLINE</p>
-          <p>${new Date().toLocaleString('th-TH')}</p>
-        </body>
-        </html>
-      `);
-      printWindow.document.close();
-      printWindow.focus();
-      setTimeout(() => printWindow.print(), 300);
-    }
   };
 
   // Purchase Order Operations (Stock In)
@@ -728,20 +915,19 @@ export default function InventoryPOS({ userPlan = 'free', onAddTransaction, open
       return updated;
     });
 
-    // Save PO document record to history
-    try {
-      const poRecord = {
-        id: `PO-${Date.now()}`,
-        date: new Date().toISOString().split('T')[0],
-        targetWarehouse: whLabel,
-        supplierName,
-        supplierTaxId,
-        items: poItems,
-        totalAmount: subtotalPo,
-      };
-      const existingPoHistory = JSON.parse(localStorage.getItem('moneyma_po_history') || '[]');
-      localStorage.setItem('moneyma_po_history', JSON.stringify([poRecord, ...existingPoHistory]));
-    } catch (e) {}
+    // บันทึกใบ PO ลงทะเบียนเอกสาร
+    saveDocHistory('moneyma_po_history', {
+      id: `PO-${Date.now().toString().slice(-6)}`,
+      docType: 'po',
+      date: new Date().toISOString().split('T')[0],
+      dateText: new Date().toLocaleString('th-TH'),
+      targetWarehouse: whLabel,
+      supplierName,
+      supplierTaxId,
+      items: poItems.map(it => ({ id: it.id, sku: it.sku, name: it.name, qty: it.qty, purchaseCost: it.purchaseCost })),
+      totalAmount: subtotalPo,
+    });
+    setHistoryTick(t => t + 1);
 
     const description = `ซื้อสินค้าเข้าสต็อก [${whLabel}] (PO): ${poItems.map(p => `${p.name} x${p.qty}`).join(', ')}`;
     if (typeof onAddTransaction === 'function') {
@@ -758,23 +944,228 @@ export default function InventoryPOS({ userPlan = 'free', onAddTransaction, open
     setPoItems([]);
   };
 
-  const handleExportPeriodicReport = () => {
+  const buildReportPayload = () => {
     let periodLabel = '';
     if (reportPeriodType === 'daily') periodLabel = `ประจำวันที่ ${reportDate}`;
     else if (reportPeriodType === 'monthly') periodLabel = `ประจำเดือน ${reportMonth}`;
     else if (reportPeriodType === 'quarterly') periodLabel = `ประจำไตรมาส ${reportQuarter} ปี ${reportYear}`;
     else periodLabel = `ประจำปี ${reportYear}`;
 
-    exportInventoryPOSReport({
+    return {
       title: 'รายงานการซื้อ-ขาย และมูลค่าสต็อกสินค้า',
-      companyName: 'MoneyMa POS & Business Ledger',
+      companyName: printerSettings.shopName || 'MoneyMa POS & Business Ledger',
       periodLabel,
       products,
       totalSales: totalRetailValue,
       totalPurchases: totalCostValue,
       totalStockCostVal: totalCostValue,
       totalStockRetailVal: totalRetailValue,
-    });
+    };
+  };
+
+  // เปิดตัวอย่างรายงานก่อน แล้วค่อยเลือกพิมพ์หรือบันทึกไฟล์
+  const handlePreviewPeriodicReport = () => {
+    setReportHtml(buildInventoryPOSReportHtml(buildReportPayload()));
+  };
+
+  const handlePrintReport = () => {
+    try {
+      const win = reportFrameRef.current?.contentWindow;
+      if (!win) throw new Error('ยังโหลดตัวอย่างไม่เสร็จ');
+      win.focus();
+      win.print();
+    } catch (e) {
+      alert('❌ สั่งพิมพ์ไม่สำเร็จ: ' + (e?.message || e) + '\nลองใช้ปุ่มบันทึกไฟล์แทน');
+    }
+  };
+
+  const handleSaveReportFile = () => {
+    exportInventoryPOSReport(buildReportPayload());
+  };
+
+  // ────────── ทะเบียนเอกสารที่ออกแล้ว (เปิดดู/พิมพ์ซ้ำได้) ──────────
+  const renderDocHistory = (title, storageKey, kind, emptyText) => {
+    const list = readDocHistory(storageKey).slice(0, 20);
+    return (
+      <div className="mm-history">
+        <h4>{title} ({readDocHistory(storageKey).length})</h4>
+        {list.length === 0 ? (
+          <div className="mm-history-empty">{emptyText}</div>
+        ) : (
+          list.map((rec, i) => (
+            <div className="mm-history-item" key={rec.id || i}>
+              <div className="mm-history-main">
+                <div className="mm-history-no">{rec.id}</div>
+                <div className="mm-history-sub">
+                  {rec.dateText || rec.date} · {(rec.items || []).length} รายการ
+                  {rec.customerName ? ` · ${rec.customerName}` : ''}
+                  {rec.supplierName ? ` · ${rec.supplierName}` : ''}
+                </div>
+              </div>
+              <div className="mm-history-amt">฿{(Number(rec.totalAmount) || 0).toLocaleString()}</div>
+              <button className="mm-history-open" onClick={() => openHistoryDoc(rec, kind)}>เปิดดู</button>
+            </div>
+          ))
+        )}
+      </div>
+    );
+  };
+
+  // ────────── ตัวเอกสารที่จะถูกพิมพ์จริง (อยู่ใน #moneyma-print-area) ──────────
+  const renderPrintableDoc = () => {
+    if (!printDoc) return null;
+    const d = printDoc;
+    const ps = printerSettings;
+    const slipWidthMm = ps.paperWidth === '58' ? 48 : 72;
+    const money = (n) => `฿${(Number(n) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+    if (d.kind === 'test') {
+      return (
+        <div className="mm-slip" style={{ width: `${slipWidthMm}mm` }}>
+          <div className="mm-slip-shop">{ps.shopName || 'MoneyMa Store'}</div>
+          <div className="mm-slip-sub">ทดสอบการพิมพ์ (Test Print)</div>
+          <div className="mm-dash" />
+          <div className="mm-row"><span>ความกว้างกระดาษ</span><span>{ps.paperWidth} มม.</span></div>
+          <div className="mm-row"><span>วันที่</span><span>{d.dateText}</span></div>
+          <div className="mm-dash" />
+          <div className="mm-center">ถ้าอ่านบรรทัดนี้ได้ครบทั้งบรรทัด<br />แปลว่าตั้งค่าความกว้างถูกต้อง</div>
+          <div className="mm-dash" />
+          <div className="mm-center">1234567890 ABCDEFGHIJ กขคงจฉชซฌญ</div>
+        </div>
+      );
+    }
+
+    if (d.kind === 'receipt') {
+      return (
+        <div className="mm-slip" style={{ width: `${slipWidthMm}mm` }}>
+          <div className="mm-slip-shop">{ps.shopName || 'MoneyMa Store'}</div>
+          {ps.shopAddress ? <div className="mm-center mm-small">{ps.shopAddress}</div> : null}
+          {ps.shopTaxId ? <div className="mm-center mm-small">เลขผู้เสียภาษี: {ps.shopTaxId}</div> : null}
+          <div className="mm-slip-sub">ใบเสร็จรับเงิน / ใบกำกับภาษีอย่างย่อ</div>
+          {ps.headerNote ? <div className="mm-center mm-small">{ps.headerNote}</div> : null}
+          <div className="mm-dash" />
+          <div className="mm-row"><span>เลขที่</span><span>{d.docNo}</span></div>
+          <div className="mm-row"><span>วันที่</span><span>{d.dateText}</span></div>
+          <div className="mm-row"><span>ลูกค้า</span><span>{d.customerName || 'ลูกค้าทั่วไป'}</span></div>
+          {d.customerTaxId ? <div className="mm-row"><span>Tax ID</span><span>{d.customerTaxId}</span></div> : null}
+          <div className="mm-dash" />
+          {(d.items || []).map((item, i) => (
+            <div key={item.id || i} className="mm-item">
+              <div className="mm-item-name">{item.name}</div>
+              <div className="mm-row">
+                <span>{item.qty} x {money(item.price)}</span>
+                <span>{money((Number(item.price) || 0) * (Number(item.qty) || 0))}</span>
+              </div>
+            </div>
+          ))}
+          <div className="mm-dash" />
+          <div className="mm-row"><span>ยอดรวมสินค้า</span><span>{money(d.subtotal)}</span></div>
+          {d.discount > 0 ? <div className="mm-row"><span>ส่วนลด</span><span>-{money(d.discount)}</span></div> : null}
+          {d.vatAmount > 0 ? <div className="mm-row"><span>VAT {d.vatPercent}%</span><span>{money(d.vatAmount)}</span></div> : null}
+          <div className="mm-row mm-total"><span>ยอดสุทธิ</span><span>{money(d.total)}</span></div>
+          <div className="mm-dash" />
+          {d.shareUrl ? (
+            <div className="mm-slip-qr">
+              <img src={qrSvgDataUrl(d.shareUrl, { quiet: 2 })} alt="สแกนเก็บใบเสร็จ" />
+              <div className="mm-center mm-small">สแกนเก็บใบเสร็จใบนี้ไว้ในมือถือ ฟรี</div>
+              <div className="mm-center mm-tiny">รหัส {d.shareToken}</div>
+              <div className="mm-dash" />
+            </div>
+          ) : null}
+          <div className="mm-center mm-small">{ps.footerNote || 'ขอบคุณที่ใช้บริการ'}</div>
+          <div className="mm-center mm-small">ออกโดยระบบ MoneyMa Business Stock &amp; POS</div>
+        </div>
+      );
+    }
+
+    // ── เอกสารเต็มหน้า: ใบสั่งขาย (SO) / ใบสั่งซื้อ (PO) ──
+    const isPo = d.kind === 'po';
+    const qrUrl = !isPo && d.promptPayId
+      ? `https://promptpay.io/${String(d.promptPayId).replace(/[^0-9]/g, '')}/${(Number(d.total) || 0).toFixed(2)}.png`
+      : '';
+
+    return (
+      <div className={`mm-doc ${isPo ? 'mm-doc-po' : 'mm-doc-so'}`}>
+        <div className="mm-doc-head">
+          <div>
+            <h1>{ps.shopName || 'MoneyMa Store'}</h1>
+            <p>{isPo ? 'ใบสั่งซื้อสินค้าเข้าสต็อก (Purchase Order)' : 'ใบสั่งขาย / ใบกำกับภาษีอย่างย่อ (Sales Order)'}</p>
+            {ps.shopAddress ? <p>{ps.shopAddress}</p> : null}
+            {ps.shopTaxId ? <p>เลขผู้เสียภาษี: {ps.shopTaxId}</p> : null}
+          </div>
+          <div className="mm-doc-meta">
+            <div className="mm-doc-no">เลขที่: {d.docNo}</div>
+            <div>วันที่: {d.dateText}</div>
+          </div>
+        </div>
+
+        <div className="mm-doc-parties">
+          <div>
+            <strong>{isPo ? 'ซัพพลายเออร์' : 'ผู้ซื้อ'}</strong>
+            <div>{isPo ? (d.supplierName || '-') : (d.customerName || 'ลูกค้าทั่วไป')}</div>
+            {(isPo ? d.supplierTaxId : d.customerTaxId)
+              ? <div>Tax ID: {isPo ? d.supplierTaxId : d.customerTaxId}</div> : null}
+          </div>
+          <div className="mm-doc-right">
+            {isPo ? (
+              <>
+                <strong>รับเข้าคลัง</strong>
+                <div>{d.warehouseLabel || '-'}</div>
+              </>
+            ) : (
+              <>
+                <strong>วิธีชำระเงิน</strong>
+                <div>PromptPay QR / โอนผ่านธนาคาร</div>
+                {d.promptPayId ? <div>พร้อมเพย์: {d.promptPayId}</div> : null}
+              </>
+            )}
+          </div>
+        </div>
+
+        <table className="mm-doc-table">
+          <thead>
+            <tr>
+              <th>SKU</th>
+              <th>รายการสินค้า</th>
+              <th className="mm-right">จำนวน</th>
+              <th className="mm-right">ราคา/หน่วย</th>
+              <th className="mm-right">รวมเงิน</th>
+            </tr>
+          </thead>
+          <tbody>
+            {(d.items || []).map((item, i) => {
+              const unit = Number(isPo ? (item.purchaseCost !== undefined ? item.purchaseCost : item.cost) : item.price) || 0;
+              return (
+                <tr key={item.id || i}>
+                  <td className="mm-sku">{item.sku}</td>
+                  <td>{item.name}</td>
+                  <td className="mm-right">{item.qty}</td>
+                  <td className="mm-right">{money(unit)}</td>
+                  <td className="mm-right">{money(unit * (Number(item.qty) || 0))}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+
+        <div className="mm-doc-summary">
+          <div><span>ยอดรวมสินค้า</span><span>{money(d.subtotal)}</span></div>
+          {d.discount > 0 ? <div><span>ส่วนลด</span><span>-{money(d.discount)}</span></div> : null}
+          {d.vatAmount > 0 ? <div><span>VAT {d.vatPercent}%</span><span>{money(d.vatAmount)}</span></div> : null}
+          <div className="mm-doc-grand"><span>ยอดสุทธิ</span><span>{money(d.total)}</span></div>
+        </div>
+
+        {qrUrl ? (
+          <div className="mm-doc-qr">
+            <div>สแกนชำระพร้อมเพย์</div>
+            <img src={qrUrl} alt="PromptPay QR" />
+            <div>{d.promptPayId}</div>
+          </div>
+        ) : null}
+
+        <div className="mm-doc-foot">{ps.footerNote || ''} · ออกโดยระบบ MoneyMa Business Stock &amp; POS</div>
+      </div>
+    );
   };
 
   return (
@@ -829,24 +1220,30 @@ export default function InventoryPOS({ userPlan = 'free', onAddTransaction, open
         </div>
       </header>
 
-      {/* PRINTER CONNECTION CONTROL BAR */}
+      {/* แถบเครื่องพิมพ์ — สถานะจริง ไม่ใช่ไฟเขียวปลอม */}
       <div className="pos-printer-bar">
         <div className="pos-printer-info">
-          <span className="pos-printer-dot" />
-          <strong>{t.thermalPrinter}</strong>
-          <span style={{ fontSize: '12px', color: '#10b981', fontWeight: 'bold' }}>{t.printerReady}</span>
+          <span className="pos-printer-icon" aria-hidden="true">{CAN_SYSTEM_PRINT ? '🖨️' : '🖼️'}</span>
+          <strong>
+            {CAN_SYSTEM_PRINT
+              ? 'พิมพ์ผ่านเครื่องพิมพ์ของระบบ (AirPrint)'
+              : 'บันทึกเอกสารเป็นรูปภาพ เพื่อส่งต่อหรือสั่งพิมพ์'}
+          </strong>
+          {CAN_SYSTEM_PRINT && (
+            <span className="pos-printer-chip">กระดาษ {printerSettings.paperWidth} มม.</span>
+          )}
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div className="pos-printer-actions">
           <label className="pos-print-toggle">
             <input
               type="checkbox"
               checked={autoPrintReceipt}
               onChange={e => setAutoPrintReceipt(e.target.checked)}
             />
-            <span>{t.autoPrintReceiptLabel}</span>
+            <span>{CAN_SYSTEM_PRINT ? 'ขึ้นหน้าพิมพ์ทันทีหลังยืนยัน' : 'ออกรูปภาพทันทีหลังยืนยัน'}</span>
           </label>
-          <button className="pos-btn-test-print" onClick={handleTestPrinter}>
-            {t.testPrintBtn}
+          <button className="pos-btn-printer-settings" onClick={() => setShowPrinterSettings(true)}>
+            {CAN_SYSTEM_PRINT ? '⚙️ ตั้งค่าเครื่องพิมพ์' : '⚙️ ตั้งค่าใบเสร็จ'}
           </button>
         </div>
       </div>
@@ -868,7 +1265,7 @@ export default function InventoryPOS({ userPlan = 'free', onAddTransaction, open
             </div>
             <div className="pos-stat-card">
               <span className="pos-stat-label">{t.statRetailVal || 'มูลค่าขายรวม (Retail)'}</span>
-              <strong className="pos-stat-val" style={{ color: '#10b981' }}>฿{totalRetailValue.toLocaleString()}</strong>
+              <strong className="pos-stat-val" style={{ color: 'var(--color-success)' }}>฿{totalRetailValue.toLocaleString()}</strong>
               <small>{(t.statEstProfit || 'กำไรคาดการณ์ ฿{val}').replace('{val}', (totalRetailValue - totalCostValue).toLocaleString())}</small>
             </div>
             <div className="pos-stat-card" style={{ borderColor: lowStockProducts.length > 0 ? '#ef4444' : undefined }}>
@@ -923,9 +1320,9 @@ export default function InventoryPOS({ userPlan = 'free', onAddTransaction, open
                   <th style={{ width: '110px', minWidth: '110px' }}>{t.thCategory || 'หมวดหมู่'}</th>
                   <th className="text-right" style={{ width: '100px', minWidth: '100px' }}>{t.thCostPrice || 'ราคาทุน (฿)'}</th>
                   <th className="text-right" style={{ width: '100px', minWidth: '100px' }}>{t.thSellPrice || 'ราคาขาย (฿)'}</th>
-                  <th className="text-right" style={{ width: '90px', minWidth: '90px', color: '#0284c7' }}>คลัง 1 (หลัก)</th>
-                  <th className="text-right" style={{ width: '90px', minWidth: '90px', color: '#0d9488' }}>คลัง 2 (หน้าร้าน)</th>
-                  <th className="text-right" style={{ width: '90px', minWidth: '90px', color: '#7c3aed' }}>คลัง 3 (สำรอง)</th>
+                  <th className="text-right" style={{ width: '90px', minWidth: '90px', color: 'var(--wh-1)' }}>คลัง 1 (หลัก)</th>
+                  <th className="text-right" style={{ width: '90px', minWidth: '90px', color: 'var(--wh-2)' }}>คลัง 2 (หน้าร้าน)</th>
+                  <th className="text-right" style={{ width: '90px', minWidth: '90px', color: 'var(--wh-3)' }}>คลัง 3 (สำรอง)</th>
                   <th className="text-right" style={{ width: '90px', minWidth: '90px' }}>สต็อกรวม</th>
                   <th className="text-center" style={{ width: '95px', minWidth: '95px' }}>{t.thStatus || 'สถานะ'}</th>
                   <th className="text-center" style={{ width: '90px', minWidth: '90px' }}>{t.thManage || 'จัดการ'}</th>
@@ -953,9 +1350,9 @@ export default function InventoryPOS({ userPlan = 'free', onAddTransaction, open
                       <td><span className="pos-cat-badge">{prod.category}</span></td>
                       <td className="text-right">฿{Number(prod.cost).toLocaleString()}</td>
                       <td className="text-right" style={{ fontWeight: 'bold' }}>฿{Number(prod.price).toLocaleString()}</td>
-                      <td className="text-right" style={{ fontWeight: 600, color: '#0284c7' }}>{w1}</td>
-                      <td className="text-right" style={{ fontWeight: 600, color: '#0d9488' }}>{w2}</td>
-                      <td className="text-right" style={{ fontWeight: 600, color: '#7c3aed' }}>{w3}</td>
+                      <td className="text-right" style={{ fontWeight: 600, color: 'var(--wh-1)' }}>{w1}</td>
+                      <td className="text-right" style={{ fontWeight: 600, color: 'var(--wh-2)' }}>{w2}</td>
+                      <td className="text-right" style={{ fontWeight: 600, color: 'var(--wh-3)' }}>{w3}</td>
                       <td className="text-right">
                         <span style={{ fontWeight: 'bold', color: isLow ? '#ef4444' : '#10b981' }}>
                           {prod.stock}
@@ -1122,7 +1519,7 @@ export default function InventoryPOS({ userPlan = 'free', onAddTransaction, open
                       cursor: 'pointer'
                     }}
                   >
-                    📝 ใบสั่งขาย (Web)
+                    📝 ใบสั่งขาย (SO)
                   </button>
 
                   <button
@@ -1147,12 +1544,15 @@ export default function InventoryPOS({ userPlan = 'free', onAddTransaction, open
                   className="pos-checkout-btn"
                   style={{ padding: '12px', fontSize: '13px', marginTop: '8px' }}
                   disabled={cart.length === 0}
-                  onClick={handleCompleteSale}
+                  onClick={openReceiptPreview}
                 >
-                  🧾 ชำระเงินสด/ออกใบเสร็จ
+                  🧾 ชำระเงินสด / ออกใบเสร็จ
                 </button>
               </div>
             </div>
+
+            {renderDocHistory('🧾 ใบเสร็จที่ออกแล้ว', 'moneyma_sales_history', 'receipt', 'ยังไม่มีใบเสร็จ')}
+            {renderDocHistory('📝 ใบสั่งขายที่ออกแล้ว', 'moneyma_so_history', 'so', 'ยังไม่มีใบสั่งขาย')}
           </div>
         </div>
       )}
@@ -1206,7 +1606,7 @@ export default function InventoryPOS({ userPlan = 'free', onAddTransaction, open
                 onChange={e => setSupplierTaxId(e.target.value)}
               />
               <div style={{ marginTop: '8px' }}>
-                <label style={{ fontSize: '11px', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '4px' }}>
+                <label style={{ fontSize: '11px', fontWeight: 700, color: 'var(--color-text-secondary)', display: 'block', marginBottom: '4px' }}>
                   🏢 รับสินค้าเข้าคลัง (Target Warehouse):
                 </label>
                 <select
@@ -1255,7 +1655,7 @@ export default function InventoryPOS({ userPlan = 'free', onAddTransaction, open
             <div className="pos-cart-summary">
               <div className="pos-sum-row total">
                 <span>{t.poTotalExpense || 'ยอดสั่งซื้อรวม (Expense):'}</span>
-                <span className="pos-grand-total" style={{ color: '#ef4444' }}>฿{subtotalPo.toLocaleString()}</span>
+                <span className="pos-grand-total" style={{ color: 'var(--color-danger)' }}>฿{subtotalPo.toLocaleString()}</span>
               </div>
 
               <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
@@ -1285,7 +1685,18 @@ export default function InventoryPOS({ userPlan = 'free', onAddTransaction, open
                   🖼️ รูปภาพ PO (.jpg)
                 </button>
               </div>
+
+              <button
+                className="mm-btn mm-btn-line"
+                style={{ width: '100%', marginTop: '8px' }}
+                disabled={poItems.length === 0}
+                onClick={handlePrintPo}
+              >
+                {CAN_SYSTEM_PRINT ? '🖨️ ดูตัวอย่าง / พิมพ์ใบสั่งซื้อ' : '🖼️ ดูตัวอย่าง / บันทึกใบสั่งซื้อ'}
+              </button>
             </div>
+
+            {renderDocHistory('🚚 ใบสั่งซื้อที่ออกแล้ว', 'moneyma_po_history', 'po', 'ยังไม่มีใบสั่งซื้อ')}
           </div>
         </div>
       )}
@@ -1365,7 +1776,7 @@ export default function InventoryPOS({ userPlan = 'free', onAddTransaction, open
             <div className="pos-stats-grid">
               <div className="pos-stat-card" style={{ borderLeft: '4px solid #10b981' }}>
                 <span className="pos-stat-label">ยอดขายรวม (Total Sales)</span>
-                <strong className="pos-stat-val" style={{ color: '#10b981' }}>
+                <strong className="pos-stat-val" style={{ color: 'var(--color-success)' }}>
                   +฿{totalRetailValue.toLocaleString()}
                 </strong>
                 <small>รายรับจากการขายสินค้า</small>
@@ -1373,7 +1784,7 @@ export default function InventoryPOS({ userPlan = 'free', onAddTransaction, open
 
               <div className="pos-stat-card" style={{ borderLeft: '4px solid #ef4444' }}>
                 <span className="pos-stat-label">ยอดสั่งซื้อเข้ารวม (Purchases)</span>
-                <strong className="pos-stat-val" style={{ color: '#ef4444' }}>
+                <strong className="pos-stat-val" style={{ color: 'var(--color-danger)' }}>
                   -฿{totalCostValue.toLocaleString()}
                 </strong>
                 <small>รายจ่ายต้นทุนสินค้า</small>
@@ -1381,7 +1792,7 @@ export default function InventoryPOS({ userPlan = 'free', onAddTransaction, open
 
               <div className="pos-stat-card" style={{ borderLeft: '4px solid #3b82f6' }}>
                 <span className="pos-stat-label">กำไรขั้นต้น (Gross Profit)</span>
-                <strong className="pos-stat-val" style={{ color: '#3b82f6' }}>
+                <strong className="pos-stat-val" style={{ color: 'var(--color-info)' }}>
                   ฿{(totalRetailValue - totalCostValue).toLocaleString()}
                 </strong>
                 <small>กำไรจากการดำเนินงาน</small>
@@ -1389,7 +1800,7 @@ export default function InventoryPOS({ userPlan = 'free', onAddTransaction, open
 
               <div className="pos-stat-card" style={{ borderLeft: '4px solid #6366f1' }}>
                 <span className="pos-stat-label">มูลค่าสินค้าในคลังปัจจุบัน</span>
-                <strong className="pos-stat-val" style={{ color: '#6366f1' }}>
+                <strong className="pos-stat-val" style={{ color: 'var(--accent-primary)' }}>
                   ฿{totalCostValue.toLocaleString()}
                 </strong>
                 <small>{products.length} รายการ ({totalStockCount} ชิ้น)</small>
@@ -1406,9 +1817,9 @@ export default function InventoryPOS({ userPlan = 'free', onAddTransaction, open
                     <th>หมวดหมู่</th>
                     <th className="text-right">ราคาทุน</th>
                     <th className="text-right">ราคาขาย</th>
-                    <th className="text-right" style={{ color: '#0284c7' }}>คลัง 1</th>
-                    <th className="text-right" style={{ color: '#0d9488' }}>คลัง 2</th>
-                    <th className="text-right" style={{ color: '#7c3aed' }}>คลัง 3</th>
+                    <th className="text-right" style={{ color: 'var(--wh-1)' }}>คลัง 1</th>
+                    <th className="text-right" style={{ color: 'var(--wh-2)' }}>คลัง 2</th>
+                    <th className="text-right" style={{ color: 'var(--wh-3)' }}>คลัง 3</th>
                     <th className="text-right">คงเหลือรวม</th>
                     <th className="text-right">มูลค่าทุนรวม</th>
                   </tr>
@@ -1427,11 +1838,11 @@ export default function InventoryPOS({ userPlan = 'free', onAddTransaction, open
                         <td><span className="pos-cat-badge">{p.category}</span></td>
                         <td className="text-right">฿{Number(p.cost).toLocaleString()}</td>
                         <td className="text-right">฿{Number(p.price).toLocaleString()}</td>
-                        <td className="text-right" style={{ color: '#0284c7', fontWeight: 600 }}>{w1}</td>
-                        <td className="text-right" style={{ color: '#0d9488', fontWeight: 600 }}>{w2}</td>
-                        <td className="text-right" style={{ color: '#7c3aed', fontWeight: 600 }}>{w3}</td>
+                        <td className="text-right" style={{ color: 'var(--wh-1)', fontWeight: 600 }}>{w1}</td>
+                        <td className="text-right" style={{ color: 'var(--wh-2)', fontWeight: 600 }}>{w2}</td>
+                        <td className="text-right" style={{ color: 'var(--wh-3)', fontWeight: 600 }}>{w3}</td>
                         <td className="text-right" style={{ fontWeight: 800 }}>{totalStk}</td>
-                        <td className="text-right" style={{ fontWeight: 700, color: '#6366f1' }}>฿{totalCostVal.toLocaleString()}</td>
+                        <td className="text-right" style={{ fontWeight: 700, color: 'var(--accent-primary)' }}>฿{totalCostVal.toLocaleString()}</td>
                       </tr>
                     );
                   })}
@@ -1453,9 +1864,9 @@ export default function InventoryPOS({ userPlan = 'free', onAddTransaction, open
                   cursor: 'pointer',
                   boxShadow: '0 4px 14px rgba(16, 185, 129, 0.3)'
                 }}
-                onClick={handleExportPeriodicReport}
+                onClick={handlePreviewPeriodicReport}
               >
-                🖨️ พิมพ์ & Export รายงานซื้อ-ขาย-สต็อก ({reportPeriodType.toUpperCase()})
+                {CAN_SYSTEM_PRINT ? '🖨️' : '📄'} ดูตัวอย่าง & ออกรายงานซื้อ-ขาย-สต็อก ({reportPeriodType.toUpperCase()})
               </button>
             </div>
           </div>
@@ -1464,142 +1875,109 @@ export default function InventoryPOS({ userPlan = 'free', onAddTransaction, open
 
       {/* PRODUCT MODAL */}
       {showProductModal && (
+        <ModalPortal>
         <div className="pos-modal-backdrop">
-          <div className="pos-modal">
+          <div className="pos-modal mm-prod-modal">
             <h3>{editingProduct ? (t.editProductTitle || 'แก้ไขสินค้า') : (t.addProductTitle || 'เพิ่มสินค้าใหม่ในคลัง')}</h3>
 
             <form onSubmit={handleSaveProduct}>
-              {/* AI Image Scan Button Bar inside Modal */}
-              <div style={{ background: '#eff6ff', border: '1px dashed #60a5fa', borderRadius: '12px', padding: '12px', marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
-                <div>
-                  <strong style={{ fontSize: '13px', color: '#1e40af', display: 'block' }}>{t.aiVisionModalHeader || '🤖 AI สแกนสินค้า/บิล/ป้ายราคา (Vision AI)'}</strong>
-                  <span style={{ fontSize: '11px', color: '#3b82f6' }}>{t.aiVisionModalSub || 'ถ่ายภาพจากกล้องหรือเลือกไฟล์รูปภาพเพื่อเติมข้อมูลอัตโนมัติ'}</span>
-                </div>
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <button
-                    type="button"
-                    disabled={isScanningAi}
-                    onClick={handleAiScanCamera}
-                    style={{ padding: '8px 14px', borderRadius: '10px', border: 'none', background: '#2563eb', color: '#fff', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}
-                  >
-                    📷 {isScanningAi ? (t.aiScanningState || 'กำลังสแกน...') : (t.btnAiCameraScan || 'AI สแกนกล้อง')}
-                  </button>
-                  <button
-                    type="button"
-                    disabled={isScanningAi}
-                    onClick={() => fileInputRef.current?.click()}
-                    style={{ padding: '8px 14px', borderRadius: '10px', border: 'none', background: '#4f46e5', color: '#fff', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}
-                  >
-                    📁 {isScanningAi ? (t.aiScanningState || 'กำลังสแกน...') : (t.btnAiFileScan || 'AI สแกนไฟล์')}
-                  </button>
-                </div>
-              </div>
+              {/* 🔴 ให้เนื้อหาเลื่อนในกล่องของตัวเอง แถบปุ่มอยู่นอกกล่อง
+                  ของเดิมใช้ position:sticky ซึ่งพื้นหลังเป็น --bg-card ที่มี alpha .86
+                  ปุ่มจึงลอยทับช่องกรอกคลัง 1 จนอ่านไม่ออก */}
+              <div className="mm-prod-body">
 
-              {/* Product Image Configuration Section */}
-              <div style={{ background: '#f8fafc', padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0', marginBottom: '14px' }}>
-                <label style={{ fontSize: '12px', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '6px' }}>
-                  🖼️ การตั้งค่ารูปภาพสินค้า (Product Image Settings):
-                </label>
-                <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
-                  {prodImageUrl ? (
-                    <img src={prodImageUrl} alt="Product Preview" style={{ width: '60px', height: '60px', borderRadius: '10px', objectFit: 'cover', border: '2px solid #6366f1' }} />
-                  ) : (
-                    <div style={{ width: '60px', height: '60px', borderRadius: '10px', background: '#e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '26px' }}>📷</div>
-                  )}
-                  <div style={{ flex: 1, minWidth: '180px' }}>
-                    <label className="pos-btn-secondary" style={{ padding: '6px 12px', fontSize: '11px', fontWeight: 700, borderRadius: '8px', cursor: 'pointer', display: 'inline-block', marginBottom: '6px', background: '#4338ca', color: '#fff' }}>
-                      📸 เลือกไฟล์รูปภาพ / ถ่ายรูป
-                      <input type="file" accept="image/*" style={{ display: 'none' }} onChange={handleProductImageFileChange} />
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="หรือระบุลิงก์รูปภาพ URL (https://...)"
-                      value={prodImageUrl}
-                      onChange={e => setProdImageUrl(e.target.value)}
-                      style={{ width: '100%', fontSize: '11px', padding: '6px 8px', borderRadius: '8px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
-                    />
-                  </div>
+                {/* ให้ AI เติมข้อมูล — แถวเดียว ไม่ใช่การ์ดสีฟ้าเต็มความกว้าง
+                    ของเดิมกินพื้นที่จนชื่อสินค้าตกไปอยู่ใต้ fold */}
+                <div className="mm-ai-strip">
+                  <span>{t.aiVisionModalHeader || 'ให้ AI เติมข้อมูลจากรูป'}</span>
+                  <span className="mm-ai-strip-btns">
+                    <button type="button" disabled={isScanningAi} onClick={handleAiScanCamera}>
+                      {isScanningAi ? (t.aiScanningState || 'กำลังสแกน…') : (t.btnAiCameraScan || 'ถ่ายรูป')}
+                    </button>
+                    <button type="button" disabled={isScanningAi} onClick={() => fileInputRef.current?.click()}>
+                      {isScanningAi ? (t.aiScanningState || 'กำลังสแกน…') : (t.btnAiFileScan || 'จากไฟล์')}
+                    </button>
+                  </span>
                 </div>
-              </div>
 
-              <div className="pos-field-row">
                 <div className="pos-field">
-                  <label>{t.thSku || 'รหัส SKU / Barcode'}</label>
-                  <input type="text" value={prodSku} onChange={e => setProdSku(e.target.value)} required />
+                  <label>{t.thProdName || 'ชื่อสินค้า'}</label>
+                  <input type="text" value={prodName} onChange={e => setProdName(e.target.value)} required />
                 </div>
-                <div className="pos-field">
-                  <label>{t.thCategory || 'หมวดหมู่สินค้า'}</label>
-                  <input type="text" value={prodCat} onChange={e => setProdCat(e.target.value)} />
-                </div>
-              </div>
 
-              <div className="pos-field">
-                <label>{t.thProdName || 'ชื่อสินค้า'}</label>
-                <input type="text" value={prodName} onChange={e => setProdName(e.target.value)} required />
-              </div>
-
-              <div className="pos-field-row">
-                <div className="pos-field">
-                  <label>{t.thCostPrice || 'ราคาทุน (฿)'}</label>
-                  <input type="number" step="0.01" value={prodCost} onChange={e => setProdCost(e.target.value)} required />
-                </div>
-                <div className="pos-field">
-                  <label>{t.thSellPrice || 'ราคาขาย (฿)'}</label>
-                  <input type="number" step="0.01" value={prodPrice} onChange={e => setProdPrice(e.target.value)} required />
-                </div>
-              </div>
-
-              {/* Multi-Warehouse Allocation */}
-              <div style={{ background: '#f8fafc', padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0', margin: '12px 0' }}>
-                <label style={{ fontSize: '12px', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '8px' }}>
-                  🏬 จัดสรรจำนวนสต็อกรายคลัง (Multi-Warehouse):
-                </label>
                 <div className="pos-field-row">
                   <div className="pos-field">
-                    <label style={{ color: '#0284c7', fontWeight: 700 }}>คลัง 1 (คลังหลัก)</label>
-                    <input type="number" value={prodWh1} onChange={e => setProdWh1(e.target.value)} required />
+                    <label>{t.thSku || 'รหัส SKU'}</label>
+                    <input type="text" value={prodSku} onChange={e => setProdSku(e.target.value)} required />
                   </div>
                   <div className="pos-field">
-                    <label style={{ color: '#0d9488', fontWeight: 700 }}>
-                      คลัง 2 (หน้าร้าน) {!hasMultiWh && <span style={{ fontSize: '10px', color: '#e11d48', marginLeft: '4px' }}>🔒 Business</span>}
-                    </label>
-                    <input
-                      type="number"
-                      value={prodWh2}
-                      onChange={e => setProdWh2(e.target.value)}
-                      disabled={!hasMultiWh}
-                      style={!hasMultiWh ? { background: '#f1f5f9', opacity: 0.7, cursor: 'not-allowed' } : {}}
-                    />
-                  </div>
-                  <div className="pos-field">
-                    <label style={{ color: '#7c3aed', fontWeight: 700 }}>
-                      คลัง 3 (สำรอง) {!hasMultiWh && <span style={{ fontSize: '10px', color: '#e11d48', marginLeft: '4px' }}>🔒 Business</span>}
-                    </label>
-                    <input
-                      type="number"
-                      value={prodWh3}
-                      onChange={e => setProdWh3(e.target.value)}
-                      disabled={!hasMultiWh}
-                      style={!hasMultiWh ? { background: '#f1f5f9', opacity: 0.7, cursor: 'not-allowed' } : {}}
-                    />
+                    <label>{t.thCategory || 'หมวดหมู่'}</label>
+                    <input type="text" value={prodCat} onChange={e => setProdCat(e.target.value)} />
                   </div>
                 </div>
-              </div>
 
-              <div className="pos-field-row">
-                <div className="pos-field">
-                  <label style={{ fontWeight: 700 }}>สต็อกรวมทั้งหมด (Total Stock)</label>
-                  <input
-                    type="number"
-                    value={(Number(prodWh1) || 0) + (Number(prodWh2) || 0) + (Number(prodWh3) || 0)}
-                    disabled
-                    style={{ background: '#e2e8f0', fontWeight: 'bold', color: '#0f172a' }}
-                  />
+                <div className="pos-field-row">
+                  <div className="pos-field">
+                    <label>{t.thCostPrice || 'ราคาทุน (฿)'}</label>
+                    <input type="number" step="0.01" value={prodCost} onChange={e => setProdCost(e.target.value)} required />
+                  </div>
+                  <div className="pos-field">
+                    <label>{t.thSellPrice || 'ราคาขาย (฿)'}</label>
+                    <input type="number" step="0.01" value={prodPrice} onChange={e => setProdPrice(e.target.value)} required />
+                  </div>
                 </div>
+
                 <div className="pos-field">
-                  <label>{t.prodModalMinStock || 'จุดเตือนสต็อกต่ำ (Min Alert)'}</label>
-                  <input type="number" value={prodMinStock} onChange={e => setProdMinStock(e.target.value)} required />
+                  <label>{t.prodImageLabel || 'รูปสินค้า'}</label>
+                  <div className="mm-img-row">
+                    {prodImageUrl ? (
+                      <img className="mm-img-thumb" src={prodImageUrl} alt="" />
+                    ) : (
+                      <div className="mm-img-thumb mm-img-thumb-empty">{t.prodImageNone || 'ยังไม่มีรูป'}</div>
+                    )}
+                    <div className="mm-img-fields">
+                      <label className="mm-img-pick">
+                        {t.prodImagePick || 'เลือกรูป / ถ่ายรูป'}
+                        <input type="file" accept="image/*" hidden onChange={handleProductImageFileChange} />
+                      </label>
+                      <input
+                        type="text"
+                        placeholder={t.prodImageUrlHint || 'หรือวางลิงก์รูป'}
+                        value={prodImageUrl}
+                        onChange={e => setProdImageUrl(e.target.value)}
+                      />
+                    </div>
+                  </div>
                 </div>
+
+                <fieldset className="mm-stock">
+                  <legend>{t.prodStockLegend || 'จำนวนในคลัง'}</legend>
+                  <div className="mm-stock-grid">
+                    <div className="pos-field">
+                      <label>คลัง 1 · หลัก</label>
+                      <input type="number" value={prodWh1} onChange={e => setProdWh1(e.target.value)} required />
+                    </div>
+                    <div className="pos-field">
+                      <label>คลัง 2 · หน้าร้าน {!hasMultiWh && <span className="mm-lock">Business</span>}</label>
+                      <input type="number" value={prodWh2} onChange={e => setProdWh2(e.target.value)} disabled={!hasMultiWh} />
+                    </div>
+                    <div className="pos-field">
+                      <label>คลัง 3 · สำรอง {!hasMultiWh && <span className="mm-lock">Business</span>}</label>
+                      <input type="number" value={prodWh3} onChange={e => setProdWh3(e.target.value)} disabled={!hasMultiWh} />
+                    </div>
+                  </div>
+                  <div className="mm-stock-foot">
+                    <span className="mm-stock-total">
+                      {t.prodStockTotal || 'รวม'}{' '}
+                      <strong>{(Number(prodWh1) || 0) + (Number(prodWh2) || 0) + (Number(prodWh3) || 0)}</strong>{' '}
+                      {t.prodStockUnit || 'ชิ้น'}
+                    </span>
+                    <label className="mm-stock-min">
+                      {t.prodModalMinStock || 'เตือนเมื่อเหลือ'}
+                      <input type="number" value={prodMinStock} onChange={e => setProdMinStock(e.target.value)} required />
+                    </label>
+                  </div>
+                </fieldset>
               </div>
 
               <div className="pos-modal-actions">
@@ -1609,14 +1987,16 @@ export default function InventoryPOS({ userPlan = 'free', onAddTransaction, open
             </form>
           </div>
         </div>
+        </ModalPortal>
       )}
 
       {/* PROMPTPAY QR PAYMENT MODAL */}
       {showQrModal && (
+        <ModalPortal>
         <div className="pos-modal-backdrop">
           <div className="pos-modal" style={{ textAlign: 'center', maxWidth: '420px' }}>
-            <h3 style={{ margin: '0 0 4px 0', color: '#047857' }}>📲 ชำระเงินด้วย PromptPay QR</h3>
-            <p style={{ margin: '0 0 16px 0', fontSize: '13px', color: '#64748b' }}>
+            <h3 style={{ margin: '0 0 4px 0', color: 'var(--color-success)' }}>📲 ชำระเงินด้วย PromptPay QR</h3>
+            <p style={{ margin: '0 0 16px 0', fontSize: '13px', color: 'var(--color-text-secondary)' }}>
               สแกน QR Code ผ่านแอปธนาคารเพื่อรับเงินเข้าบัญชี
             </p>
 
@@ -1661,7 +2041,7 @@ export default function InventoryPOS({ userPlan = 'free', onAddTransaction, open
               <button
                 type="button"
                 className="pos-btn-submit"
-                style={{ flex: 2, background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', boxShadow: '0 4px 12px rgba(16,185,129,0.3)' }}
+                style={{ flex: 2, background: 'linear-gradient(135deg, #047857 0%, #065f46 100%)', boxShadow: '0 4px 12px rgba(4,120,87,0.35)' }}
                 onClick={handleConfirmQrPayment}
               >
                 ✅ ยืนยันโอนเงินสำเร็จ & ออกใบเสร็จ
@@ -1669,10 +2049,12 @@ export default function InventoryPOS({ userPlan = 'free', onAddTransaction, open
             </div>
           </div>
         </div>
+        </ModalPortal>
       )}
 
       {/* DOCUMENT JPG PREVIEW & SHARE MODAL */}
       {showJpgModal && (
+        <ModalPortal>
         <div className="pos-modal-backdrop" style={{ zIndex: 10005 }}>
           <div className="pos-modal" style={{ maxWidth: '600px', padding: '20px', textAlign: 'center' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
@@ -1680,17 +2062,20 @@ export default function InventoryPOS({ userPlan = 'free', onAddTransaction, open
               <button className="ecm-close" onClick={() => setShowJpgModal(false)} style={{ background: '#f1f5f9', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer' }}>✕</button>
             </div>
 
-            <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '14px', padding: '10px', maxHeight: '58vh', overflowY: 'auto', marginBottom: '16px' }}>
+            <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '14px', padding: '10px', maxHeight: '58vh', overflowY: 'auto', overflowX: 'hidden', marginBottom: '16px', minWidth: 0, width: '100%', boxSizing: 'border-box' }}>
+              {/* 🔴 minWidth:0 สำคัญ: .pos-modal เป็น flex column ลูกจะไม่ยอมหดต่ำกว่าความกว้างจริงของรูป (800px)
+                  ทำให้รูปล้นออกนอก modal แล้วถูกตัดขอบขวา */}
               <img
                 src={jpgDataUrl}
                 alt="Document JPG Preview"
-                style={{ width: '100%', height: 'auto', borderRadius: '8px', boxShadow: '0 4px 14px rgba(0,0,0,0.1)' }}
+                style={{ width: '100%', maxWidth: '100%', height: 'auto', display: 'block', borderRadius: '8px', boxShadow: '0 4px 14px rgba(0,0,0,0.1)' }}
               />
             </div>
 
             <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' }}>
               <button
-                onClick={() => shareOrDownloadJpg(jpgDataUrl, jpgFileName)}
+                onClick={handleShareJpg}
+                disabled={isSharingJpg}
                 style={{
                   padding: '10px 18px',
                   borderRadius: '12px',
@@ -1703,9 +2088,11 @@ export default function InventoryPOS({ userPlan = 'free', onAddTransaction, open
                   boxShadow: '0 4px 12px rgba(16,185,129,0.3)'
                 }}
               >
-                📲 แชร์รูปภาพออก / บันทึกภาพ (.jpg)
+                {isSharingJpg ? '⏳ กำลังบันทึก...' : '📲 บันทึกลงเครื่อง / แชร์รูปภาพ (.jpg)'}
               </button>
 
+              {/* 🔴 <a download> ใช้ไม่ได้ใน WKWebView -> แสดงเฉพาะบนเว็บ */}
+              {!Capacitor.isNativePlatform() && (
               <a
                 href={jpgDataUrl}
                 download={jpgFileName}
@@ -1723,6 +2110,7 @@ export default function InventoryPOS({ userPlan = 'free', onAddTransaction, open
               >
                 📥 ดาวน์โหลดรูปภาพ (.jpg)
               </a>
+              )}
 
               <button
                 onClick={() => setShowJpgModal(false)}
@@ -1742,7 +2130,267 @@ export default function InventoryPOS({ userPlan = 'free', onAddTransaction, open
             </div>
           </div>
         </div>
+        </ModalPortal>
       )}
+
+      {/* ────────── พรีวิวเอกสารก่อนพิมพ์ ──────────
+          เอกสารจริงอยู่ใน #moneyma-print-area ซึ่ง @media print จะโชว์เฉพาะส่วนนี้ */}
+      {printDoc && (
+        <ModalPortal>
+        <div className="pos-modal-backdrop mm-print-backdrop" style={{ zIndex: 10006 }}>
+          <div className="pos-modal mm-print-modal">
+            <div className="mm-print-head no-print">
+              <h3>
+                {printDoc.kind === 'receipt' && '🧾 ตรวจสอบใบเสร็จก่อนพิมพ์'}
+                {printDoc.kind === 'so' && '📝 ใบสั่งขาย (Sales Order)'}
+                {printDoc.kind === 'po' && '🚚 ใบสั่งซื้อ (Purchase Order)'}
+                {printDoc.kind === 'test' && '🖨️ ทดสอบการพิมพ์'}
+              </h3>
+              <button className="mm-print-close" onClick={() => setPrintDoc(null)}>✕</button>
+            </div>
+
+            {printDoc.kind === 'receipt' && !printDoc.committed && (
+              <div className="mm-print-warn no-print">
+                ⚠️ ยังไม่บันทึกการขาย — ตรวจรายการให้ครบก่อนกดยืนยัน ระบบจะตัดสต็อกและบันทึกรายรับเมื่อกดยืนยันเท่านั้น
+              </div>
+            )}
+            {printDoc.kind === 'receipt' && printDoc.committed && (
+              <div className="mm-print-ok no-print">
+                ✅ บันทึกการขายเรียบร้อย ตัดสต็อกและบันทึกรายรับแล้ว
+              </div>
+            )}
+
+            <div className="mm-print-scroll">
+              <div id="moneyma-print-area">
+                {renderPrintableDoc()}
+              </div>
+            </div>
+
+            <div className="mm-print-actions no-print">
+              {printDoc.kind === 'receipt' && !printDoc.committed ? (
+                <>
+                  <button className="mm-btn mm-btn-ghost" onClick={() => setPrintDoc(null)}>ยกเลิก</button>
+                  {/* ปุ่มหลักทำตามสวิตช์ "พิมพ์อัตโนมัติ" บนแถบเครื่องพิมพ์ */}
+                  <button className="mm-btn mm-btn-line" onClick={() => commitSale(!autoPrintReceipt)}>
+                    {autoPrintReceipt ? '✅ ยืนยัน (ไม่ออกเอกสาร)' : (CAN_SYSTEM_PRINT ? '🖨️ ยืนยัน & พิมพ์' : '🖼️ ยืนยัน & บันทึกรูป')}
+                  </button>
+                  <button className="mm-btn mm-btn-primary" onClick={() => commitSale(autoPrintReceipt)}>
+                    {autoPrintReceipt
+                      ? (CAN_SYSTEM_PRINT ? '🖨️ ยืนยัน & พิมพ์' : '🖼️ ยืนยัน & บันทึกรูป')
+                      : '✅ ยืนยันการขาย'}
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button className="mm-btn mm-btn-ghost" onClick={() => setPrintDoc(null)}>ปิด</button>
+                  {printDoc.kind !== 'test' && (
+                    <button className="mm-btn mm-btn-line" onClick={handleSaveDocAsImage}>🖼️ บันทึกเป็นรูปภาพ / แชร์</button>
+                  )}
+                  {CAN_SYSTEM_PRINT && (
+                    <button className="mm-btn mm-btn-primary" onClick={doPrint}>🖨️ พิมพ์</button>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+        </ModalPortal>
+      )}
+
+      {/* ────────── ตั้งค่าเครื่องพิมพ์ ────────── */}
+      {showPrinterSettings && (
+        <ModalPortal>
+        <div className="pos-modal-backdrop" style={{ zIndex: 10007 }}>
+          <div className="pos-modal" style={{ maxWidth: '460px' }}>
+            <div className="mm-print-head">
+              <h3>{CAN_SYSTEM_PRINT ? '⚙️ ตั้งค่าเครื่องพิมพ์ & ใบเสร็จ' : '⚙️ ตั้งค่าใบเสร็จ'}</h3>
+              <button className="mm-print-close" onClick={() => setShowPrinterSettings(false)}>✕</button>
+            </div>
+
+            <div className="mm-bt">
+              <div className="mm-bt-head">
+                <span className="mm-bt-title">เครื่องพิมพ์สลิปบลูทูธ</span>
+                <span className={`mm-bt-dot ${btConnected ? 'on' : ''}`} />
+                <span className="mm-bt-state">
+                  {btConnected ? (btName || 'ต่ออยู่') : 'ยังไม่ได้ต่อ'}
+                </span>
+              </div>
+
+              {btSupport.ok ? (
+                <>
+                  <div className="mm-bt-actions">
+                    {btConnected ? (
+                      <>
+                        <button type="button" className="mm-btn mm-btn-ghost" onClick={handleBtDisconnect}>
+                          ตัดการเชื่อมต่อ
+                        </button>
+                        <button
+                          type="button"
+                          className="mm-btn mm-btn-line"
+                          disabled={Boolean(btBusy)}
+                          onClick={() => printViaBluetooth({ kind: 'test' })}
+                        >
+                          พิมพ์ใบทดสอบ
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        type="button"
+                        className="mm-btn mm-btn-primary"
+                        disabled={Boolean(btBusy)}
+                        onClick={handleBtConnect}
+                      >
+                        ค้นหาและต่อเครื่องพิมพ์
+                      </button>
+                    )}
+                    {btBusy ? <span className="mm-bt-busy">{btBusy}</span> : null}
+                  </div>
+                  <p className="mm-bt-note">
+                    รองรับเฉพาะเครื่องพิมพ์ที่เป็น <strong>BLE (Bluetooth 4.0 ขึ้นไป)</strong> เท่านั้น
+                    รุ่นที่สเปกเขียนว่า Bluetooth 2.0/3.0 SPP ใช้ไม่ได้
+                  </p>
+                </>
+              ) : (
+                <p className="mm-bt-note">{btSupport.message}</p>
+              )}
+            </div>
+
+            <p className="mm-hint">
+              {CAN_SYSTEM_PRINT
+                ? 'ถ้าไม่ได้ต่อเครื่องพิมพ์บลูทูธ แอปจะพิมพ์ผ่านระบบพิมพ์ของเครื่อง (AirPrint บน iPhone/iPad)'
+                : 'ถ้าไม่ได้ต่อเครื่องพิมพ์บลูทูธ แอปจะบันทึกเอกสารเป็นรูปภาพให้ แล้วคุณส่งเข้าแอปเครื่องพิมพ์หรือส่งต่อทางแชทได้'}
+            </p>
+
+            <div className="pos-field">
+              <label>ความกว้างกระดาษ</label>
+              <div className="mm-seg">
+                {['58', '80'].map(w => (
+                  <button
+                    key={w}
+                    type="button"
+                    className={printerSettings.paperWidth === w ? 'active' : ''}
+                    onClick={() => setPrinterSettings(prev => ({ ...prev, paperWidth: w }))}
+                  >
+                    {w} มม.
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="pos-field">
+              <label>ชื่อร้าน (หัวใบเสร็จ)</label>
+              <input
+                type="text"
+                value={printerSettings.shopName}
+                onChange={e => setPrinterSettings(prev => ({ ...prev, shopName: e.target.value }))}
+              />
+            </div>
+
+            <div className="pos-field">
+              <label>ที่อยู่ร้าน</label>
+              <input
+                type="text"
+                value={printerSettings.shopAddress}
+                placeholder="ไม่บังคับ"
+                onChange={e => setPrinterSettings(prev => ({ ...prev, shopAddress: e.target.value }))}
+              />
+            </div>
+
+            <div className="pos-field">
+              <label>เลขประจำตัวผู้เสียภาษีของร้าน</label>
+              <input
+                type="text"
+                value={printerSettings.shopTaxId}
+                placeholder="ไม่บังคับ"
+                onChange={e => setPrinterSettings(prev => ({ ...prev, shopTaxId: e.target.value }))}
+              />
+            </div>
+
+            <div className="pos-field">
+              <label>ข้อความหัวใบเสร็จ</label>
+              <input
+                type="text"
+                value={printerSettings.headerNote}
+                placeholder="ไม่บังคับ เช่น สาขาสีลม"
+                onChange={e => setPrinterSettings(prev => ({ ...prev, headerNote: e.target.value }))}
+              />
+            </div>
+
+            <div className="pos-field">
+              <label>ข้อความท้ายใบเสร็จ</label>
+              <input
+                type="text"
+                value={printerSettings.footerNote}
+                onChange={e => setPrinterSettings(prev => ({ ...prev, footerNote: e.target.value }))}
+              />
+            </div>
+
+            <div className="pos-modal-actions">
+              <button
+                type="button"
+                className="pos-btn-cancel"
+                onClick={() => setPrinterSettings(DEFAULT_PRINTER_SETTINGS)}
+              >
+                คืนค่าเริ่มต้น
+              </button>
+              {CAN_SYSTEM_PRINT && (
+                <button
+                  type="button"
+                  className="mm-btn mm-btn-line"
+                  onClick={() => { setShowPrinterSettings(false); handleTestPrint(); }}
+                >
+                  🖨️ พิมพ์ทดสอบ
+                </button>
+              )}
+              <button
+                type="button"
+                className="mm-btn mm-btn-primary"
+                onClick={() => setShowPrinterSettings(false)}
+              >
+                เสร็จสิ้น
+              </button>
+            </div>
+          </div>
+        </div>
+        </ModalPortal>
+      )}
+
+      {/* ────────── ตัวอย่างรายงานประจำงวด ──────────
+          แสดงในกรอบ iframe (sandbox ปิดสคริปต์) เพื่อให้เห็นหน้าตาจริงก่อนพิมพ์/บันทึก */}
+      {reportHtml && (
+        <ModalPortal>
+        <div className="pos-modal-backdrop" style={{ zIndex: 10008 }}>
+          <div className="pos-modal mm-report-modal">
+            <div className="mm-print-head">
+              <h3>📊 ตัวอย่างรายงานประจำงวด</h3>
+              <button className="mm-print-close" onClick={() => setReportHtml('')}>✕</button>
+            </div>
+
+            <iframe
+              ref={reportFrameRef}
+              className="mm-report-frame"
+              title="ตัวอย่างรายงานประจำงวด"
+              srcDoc={reportHtml}
+              sandbox="allow-same-origin allow-modals"
+            />
+
+            <div className="mm-print-actions">
+              <button className="mm-btn mm-btn-ghost" onClick={() => setReportHtml('')}>ปิด</button>
+              <button className="mm-btn mm-btn-line" onClick={handleSaveReportFile}>💾 บันทึกไฟล์ / แชร์</button>
+              {CAN_SYSTEM_PRINT && (
+                <button className="mm-btn mm-btn-primary" onClick={handlePrintReport}>🖨️ พิมพ์</button>
+              )}
+            </div>
+          </div>
+        </div>
+        </ModalPortal>
+      )}
+
+      <AIConsentModal
+        isOpen={showAIConsent}
+        onAccept={handleConsentAccept}
+        onDecline={handleConsentDecline}
+      />
     </div>
   );
 }

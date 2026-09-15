@@ -251,6 +251,9 @@ export const en = {
     loginFailed: 'Failed to sign in. Please check your credentials.',
     registerFailed: 'Failed to sign up.',
     signOutBtn: 'Sign Out',
+    signInWithGoogle: 'Sign in with Google',
+    signInWithApple: 'Sign in with Apple',
+    orContinueWith: 'or continue with',
 
     // ─── Premium ─────────────────────────────────────────────
     premiumTitle: 'MoneyMa Premium',
@@ -520,9 +523,9 @@ export const en = {
     badgeOneTime: 'One-time',
 
     // ── ข้อผิดพลาดระบบชำระเงิน ──
-    billNotConfigured: 'In-app billing is not set up yet. Please subscribe on the website',
-    billNoOfferings: 'No packages are available from Google Play yet. Try again later, or subscribe on the website',
-    billStoreError: 'Could not reach Google Play. Check that you are signed in to the Play Store',
+    billNotConfigured: 'In-app billing is temporarily unavailable. Please try again later.',
+    billNoOfferings: 'No packages available from App Store / Google Play yet. Please try again later.',
+    billStoreError: 'Could not reach App Store / Google Play. Check your internet connection or Store login.',
     billInitFailed: 'Billing failed to start. Please try again',
     billNoPackages: 'No packages are available right now',
     billPackageNotFound: 'No package found for {plan} {period} (available: {list})',
@@ -587,10 +590,17 @@ export const en = {
     statLowStockAlert: 'Low Stock Alerts',
     statBelowMin: 'Below minimum threshold',
     itemsInStockHeader: 'Stock Inventory Items',
-    btnAiCameraScan: 'AI Camera Scan',
-    btnAiFileScan: 'AI File Scan',
+    btnAiCameraScan: 'Camera',
+    btnAiFileScan: 'From file',
     aiScanningState: 'Scanning...',
-    aiVisionModalHeader: '🤖 AI Vision Product & Receipt Scan',
+    aiVisionModalHeader: 'Let AI fill in the details',
+    prodImageLabel: 'Product photo',
+    prodImageNone: 'No photo yet',
+    prodImagePick: 'Choose / take photo',
+    prodImageUrlHint: 'Or paste an image link',
+    prodStockLegend: 'Stock on hand',
+    prodStockTotal: 'Total',
+    prodStockUnit: 'pcs',
     aiVisionModalSub: 'Capture camera photo or upload image file to autofill details',
     addNewProduct: '+ Add New Product',
     editProductTitle: 'Edit Product',
@@ -626,7 +636,7 @@ export const en = {
     poUnitCost: 'Unit Cost: ฿',
     poTotalExpense: 'Total Purchase (Expense):',
     completePoBtn: '📥 Receive Goods & Record Expense',
-    prodModalMinStock: 'Low Stock Alert Threshold',
+    prodModalMinStock: 'Alert below',
 
     // ─── Statement Builder ───
     customizeStatementDesc: 'Select columns, add logo/tax ID, and generate professional PDF/HTML statement reports',

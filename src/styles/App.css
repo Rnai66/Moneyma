@@ -238,11 +238,14 @@ td.num,
 .app {
   position: relative;
   display: flex;
+  width: 100%;
+  max-width: 100vw;
   min-height: 100vh;
   min-height: 100dvh;
   height: 100vh;
   height: 100dvh;
   overflow: hidden;
+  box-sizing: border-box;
   background:
     radial-gradient(ellipse 900px 500px at 8% -5%, rgba(109, 128, 255, 0.18), transparent 70%),
     radial-gradient(ellipse 700px 500px at 100% 100%, rgba(67, 221, 158, 0.07), transparent 70%),
@@ -2502,7 +2505,7 @@ tr.is-editing {
    --------------------------------------------------- */
 .mobile-nav,
 .mobile-premium-btn {
-  display: none;
+  display: none !important;
 }
 
 /* ---------------------------------------------------
@@ -2637,7 +2640,7 @@ tr.is-editing {
     right: max(env(safe-area-inset-right, 10px), 10px);
     bottom: max(env(safe-area-inset-bottom, 10px), 10px);
     z-index: 40;
-    display: grid;
+    display: grid !important;
     grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
     gap: var(--space-1);
     padding: var(--space-2);
@@ -2712,7 +2715,7 @@ tr.is-editing {
   }
 
   .mobile-premium-btn {
-    display: flex;
+    display: flex !important;
     position: fixed;
     top: max(env(safe-area-inset-top, 14px), 14px);
     right: max(env(safe-area-inset-right, 14px), 14px);

@@ -26,6 +26,9 @@ const USER_TABLES = [
   'transactions',
   'user_ai_usage',
   'subscriptions',
+  'sales_history',
+  'po_history',
+  'products',
   'user_profiles',
 ] as const;
 

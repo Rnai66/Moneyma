@@ -253,6 +253,9 @@ export const th = {
     loginFailed: 'การเข้าสู่ระบบผิดพลาด กรุณาตรวจสอบข้อมูลประจำตัวของคุณ',
     registerFailed: 'การสมัครสมาชิกผิดพลาด',
     signOutBtn: 'ออกจากระบบ',
+    signInWithGoogle: 'เข้าสู่ระบบด้วย Google',
+    signInWithApple: 'เข้าสู่ระบบด้วย Apple',
+    orContinueWith: 'หรือเข้าสู่ระบบด้วย',
 
     // ─── Premium ─────────────────────────────────────────────
     premiumTitle: 'MoneyMa Premium',
@@ -522,9 +525,9 @@ export const th = {
     badgeOneTime: 'จ่ายครั้งเดียว',
 
     // ── ข้อผิดพลาดระบบชำระเงิน ──
-    billNotConfigured: 'ระบบชำระเงินในแอปยังไม่ได้ตั้งค่า กรุณาสมัครผ่านเว็บไซต์',
-    billNoOfferings: 'ยังไม่มีแพ็กเกจให้เลือกจาก Google Play โปรดลองใหม่ภายหลัง หรือสมัครผ่านเว็บไซต์',
-    billStoreError: 'เชื่อมต่อ Google Play ไม่สำเร็จ ตรวจสอบว่าเข้าสู่ระบบ Play Store แล้ว',
+    billNotConfigured: 'ระบบชำระเงินในแอปยังไม่พร้อมใช้งานชั่วคราว กรุณาลองใหม่อีกครั้งภายหลัง',
+    billNoOfferings: 'ยังไม่มีแพ็กเกจให้เลือกจาก App Store / Google Play โปรดลองใหม่ภายหลัง',
+    billStoreError: 'เชื่อมต่อ App Store / Google Play ไม่สำเร็จ ตรวจสอบการเชื่อมต่อหรือการเข้าสู่ระบบบัญชี Store',
     billInitFailed: 'เริ่มระบบชำระเงินไม่สำเร็จ กรุณาลองใหม่',
     billNoPackages: 'ยังไม่มีแพ็กเกจให้เลือกในขณะนี้',
     billPackageNotFound: 'ไม่พบแพ็กเกจสำหรับ {plan} {period} (มีในระบบ: {list})',
@@ -589,10 +592,17 @@ export const th = {
     statLowStockAlert: 'เตือนสินค้าใกล้หมด',
     statBelowMin: 'ต่ำกว่าระดับขั้นต่ำ',
     itemsInStockHeader: 'รายการสินค้าในสต็อก',
-    btnAiCameraScan: 'AI สแกนกล้อง',
-    btnAiFileScan: 'AI สแกนไฟล์',
+    btnAiCameraScan: 'ถ่ายรูป',
+    btnAiFileScan: 'จากไฟล์',
     aiScanningState: 'กำลังสแกน...',
-    aiVisionModalHeader: '🤖 AI สแกนสินค้า/บิล/ป้ายราคา (Vision AI)',
+    aiVisionModalHeader: 'ให้ AI เติมข้อมูลจากรูป',
+    prodImageLabel: 'รูปสินค้า',
+    prodImageNone: 'ยังไม่มีรูป',
+    prodImagePick: 'เลือกรูป / ถ่ายรูป',
+    prodImageUrlHint: 'หรือวางลิงก์รูป',
+    prodStockLegend: 'จำนวนในคลัง',
+    prodStockTotal: 'รวม',
+    prodStockUnit: 'ชิ้น',
     aiVisionModalSub: 'ถ่ายภาพจากกล้องหรือเลือกไฟล์รูปภาพเพื่อเติมข้อมูลอัตโนมัติ',
     addNewProduct: '+ เพิ่มสินค้าใหม่',
     editProductTitle: 'แก้ไขสินค้า',
@@ -628,7 +638,7 @@ export const th = {
     poUnitCost: 'ทุนซื้อ: ฿',
     poTotalExpense: 'ยอดสั่งซื้อรวม (Expense):',
     completePoBtn: '📥 รับสินค้าเข้าสต็อก & บันทึกรายจ่าย',
-    prodModalMinStock: 'จุดเตือนสต็อกต่ำ (Min Alert)',
+    prodModalMinStock: 'เตือนเมื่อเหลือ',
 
     // ─── Statement Builder ───
     customizeStatementDesc: 'เลือกคอลัมน์ ใส่โลโก้/เลขผู้เสียภาษี และออกรายงานสเตทเมนต์ PDF/HTML มืออาชีพ',

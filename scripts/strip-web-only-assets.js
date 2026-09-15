@@ -29,7 +29,20 @@ const WEB_ONLY_FILES = [
   'privacy-policy.html',
 ];
 
+// โฟลเดอร์ที่มีเฉพาะบนเว็บ — /r/ คือหน้ารับ QR จากใบเสร็จ ซึ่งลูกค้าเปิดใน
+// เบราว์เซอร์เท่านั้น ไม่มีเหตุผลให้ติดไปกับ APK/IPA
+const WEB_ONLY_DIRS = ['r'];
+
 let removed = 0;
+
+for (const dir of WEB_ONLY_DIRS) {
+  const target = path.join(BUILD_DIR, dir);
+  if (fs.existsSync(target)) {
+    fs.rmSync(target, { recursive: true, force: true });
+    console.log(`  removed  ${dir}/`);
+    removed += 1;
+  }
+}
 
 for (const file of WEB_ONLY_FILES) {
   const target = path.join(BUILD_DIR, file);

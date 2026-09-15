@@ -3,9 +3,16 @@ import { useAuth } from '../services/AuthContext';
 import { useLanguage } from '../services/LanguageContext';
 import '../styles/Auth.css';
 import { APP_ICON } from '../config/appInfo';
+import AppleSignInButton from '../components/AppleSignInButton';
 
 export default function Register({ onSwitchToLogin, onRegisterSuccess }) {
-  const { signUp, error: authError, loading: isLoading } = useAuth();
+  const {
+    signUp,
+    signInWithGoogle,
+    signInWithApple,
+    error: authError,
+    loading: isLoading,
+  } = useAuth();
   const { t, language, switchLanguage } = useLanguage();
   const [formData, setFormData] = useState({
     firstName: '',
@@ -133,9 +140,9 @@ export default function Register({ onSwitchToLogin, onRegisterSuccess }) {
             <h2>{t.registerTitle}</h2>
 
             {(error || authError) && (
-              <div className="auth-error">
+            <div className="auth-error">
               <span>⚠️</span>
-              <p>{error || authError?.message || 'An error occurred'}</p>
+              <p>{error || (typeof authError === 'string' ? authError : authError?.message) || 'An error occurred'}</p>
             </div>
           )}
 
@@ -213,6 +220,26 @@ export default function Register({ onSwitchToLogin, onRegisterSuccess }) {
             className="auth-button"
           >
             {isSubmitting || isLoading ? t.signingUp : t.signUpBtn}
+          </button>
+
+          <div className="auth-divider">
+            <span>{t.orContinueWith || (language === 'th' ? 'หรือเข้าสู่ระบบด้วย' : 'or continue with')}</span>
+          </div>
+          <AppleSignInButton
+            onClick={signInWithApple}
+            disabled={isSubmitting || isLoading}
+            language={language}
+            mode="signUp"
+          />
+
+          <button
+            type="button"
+            className="google-button"
+            onClick={signInWithGoogle}
+            disabled={isSubmitting || isLoading}
+          >
+            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" />
+            {t.signInWithGoogle || (language === 'th' ? 'เข้าสู่ระบบด้วย Google' : 'Sign in with Google')}
           </button>
         </form>
         )}

@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>ใบเสร็จของคุณ · MoneyMa</title>
+<meta name="robots" content="noindex" />
+<meta name="theme-color" content="#047857" />
+<!--
+  หน้ารับ QR จากใบเสร็จ POS
+
+  🔴 หน้านี้คือจุดที่ install_per_receipt เกิดหรือดับ ทุกวินาทีที่โหลดช้า
+     คือคนเดินจากร้านออกไปแล้วปิดทิ้ง จึงห้ามใส่ React ห้ามใส่ฟอนต์จากเน็ต
+     ห้ามใส่ไลบรารีใดๆ ทั้งสิ้น — ไฟล์เดียว โหลดจบใน request เดียว
+
+  🔴 ลำดับสำคัญ: โชว์ใบเสร็จให้ดูก่อน แล้วค่อยชวนโหลดแอป
+     ถ้าเด้งไปสโตร์ทันที คนจะกดปิดเพราะยังไม่เห็นว่าได้อะไร
+-->
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans Thai",sans-serif;
+    background:#f1f5f9;color:#0f172a;line-height:1.55;
+    padding:16px 16px calc(16px + env(safe-area-inset-bottom));
+    display:flex;flex-direction:column;align-items:center;min-height:100vh;
+  }
+  .wrap{width:100%;max-width:420px}
+  .brand{display:flex;align-items:center;gap:8px;justify-content:center;margin:8px 0 16px;
+    font-weight:700;color:#047857;font-size:15px}
+  .brand-dot{width:22px;height:22px;border-radius:7px;background:#047857;color:#fff;
+    display:grid;place-items:center;font-size:12px}
+
+  .card{background:#fff;border-radius:16px;padding:20px;box-shadow:0 1px 3px rgba(15,23,42,.08)}
+  .shop{font-size:17px;font-weight:700;text-align:center}
+  .meta{font-size:12px;color:#64748b;text-align:center;margin-top:2px}
+  .dash{border-top:1px dashed #cbd5e1;margin:16px 0}
+  .total-label{font-size:12px;color:#64748b;text-align:center}
+  .total{font-size:34px;font-weight:800;text-align:center;color:#047857;letter-spacing:-.5px}
+  .items{font-size:12px;color:#64748b;text-align:center;margin-top:4px}
+
+  .pitch{margin-top:18px;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:14px;padding:16px}
+  .pitch h2{font-size:15px;color:#065f46;margin-bottom:8px}
+  .pitch li{font-size:13px;color:#047857;margin-left:18px;margin-bottom:3px}
+
+  .btn{display:block;width:100%;margin-top:12px;padding:15px;border-radius:12px;border:0;
+    font-size:16px;font-weight:700;text-align:center;text-decoration:none;cursor:pointer;
+    font-family:inherit}
+  .btn-main{background:#047857;color:#fff}
+  .btn-main:active{background:#065f46}
+  .btn-ghost{background:#fff;color:#334155;border:1px solid #cbd5e1;font-weight:600;font-size:14px}
+
+  .note{font-size:11px;color:#94a3b8;text-align:center;margin-top:14px}
+  .code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;color:#94a3b8}
+
+  .state{text-align:center;padding:40px 20px;color:#64748b;font-size:14px}
+  .spin{width:26px;height:26px;border:3px solid #e2e8f0;border-top-color:#047857;
+    border-radius:50%;margin:0 auto 12px;animation:s .8s linear infinite}
+  @keyframes s{to{transform:rotate(360deg)}}
+  [hidden]{display:none!important}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="brand"><span class="brand-dot">฿</span><span>MoneyMa</span></div>
+
+  <div id="loading" class="card state"><div class="spin"></div>กำลังเปิดใบเสร็จ…</div>
+
+  <div id="bad" class="card state" hidden>
+    ไม่พบใบเสร็จนี้<br />
+    <span style="font-size:12px">ลิงก์อาจพิมพ์ผิด หรือใบเสร็จเก่าเกินไป</span>
+  </div>
+
+  <div id="ok" hidden>
+    <div class="card">
+      <div class="shop" id="shop">—</div>
+      <div class="meta" id="when">—</div>
+      <div class="dash"></div>
+      <div class="total-label">ยอดชำระ</div>
+      <div class="total" id="total">—</div>
+      <div class="items" id="items"></div>
+    </div>
+
+    <div class="pitch">
+      <h2>เก็บใบเสร็จนี้ไว้ในมือถือ ฟรี</h2>
+      <ul>
+        <li>สแกนสลิป/ใบเสร็จ ลงบัญชีให้อัตโนมัติ</li>
+        <li>รู้ว่าเดือนนี้หมดไปกับอะไรมากที่สุด</li>
+        <li>ไม่ต้องเก็บกระดาษ ไม่ต้องจดเอง</li>
+      </ul>
+      <a class="btn btn-main" id="cta" href="#">ดาวน์โหลดแอป MoneyMa</a>
+      <a class="btn btn-ghost" id="open-app" href="#">เปิดในแอป (ถ้าติดตั้งแล้ว)</a>
+    </div>
+
+    <div class="note">
+      รหัสใบเสร็จ <span class="code" id="tok"></span><br />
+      ใบเสร็จนี้ออกจากระบบ MoneyMa POS ของทางร้าน
+    </div>
+  </div>
+</div>
+
+<script src="config.js"></script>
+<script>
+(function () {
+  var CFG = window.MM_R_CONFIG || {};
+  var token = new URLSearchParams(location.search).get('t') || '';
+
+  // รูปแบบ token: 16 ตัว จากชุดอักษรที่ตัด I L O 0 1 ออก (ดู src/utils/shareToken.js)
+  var VALID = /^[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{16}$/;
+
+  var ua = navigator.userAgent || '';
+  var isIOS = /iPad|iPhone|iPod/.test(ua) || (/Mac/.test(ua) && navigator.maxTouchPoints > 1);
+  var isAndroid = /Android/.test(ua);
+  var platform = isIOS ? 'ios' : isAndroid ? 'android' : 'web';
+
+  var $ = function (id) { return document.getElementById(id); };
+  function show(id) { ['loading', 'bad', 'ok'].forEach(function (k) { $(k).hidden = k !== id; }); }
+
+  function rpc(fn, body) {
+    return fetch(CFG.supabaseUrl + '/rest/v1/rpc/' + fn, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: CFG.supabaseAnonKey,
+        Authorization: 'Bearer ' + CFG.supabaseAnonKey
+      },
+      body: JSON.stringify(body)
+    });
+  }
+
+  function baht(n) {
+    return '฿' + (Number(n) || 0).toLocaleString('th-TH', {
+      minimumFractionDigits: 2, maximumFractionDigits: 2
+    });
+  }
+
+  function storeUrl() {
+    if (isIOS) return CFG.appStoreUrl;
+    if (isAndroid) {
+      // Play รับ referrer แล้วส่งต่อให้แอปตอนเปิดครั้งแรก = วัด install ได้จริงบน Android
+      return CFG.playStoreUrl + '&referrer=' + encodeURIComponent('utm_source=pos_receipt&mm_token=' + token);
+    }
+    return CFG.playStoreUrl;
+  }
+
+  if (!VALID.test(token)) { show('bad'); return; }
+  $('tok').textContent = token;
+
+  rpc('record_receipt_scan', { p_token: token, p_platform: platform })
+    .then(function (r) { return r.ok ? r.json() : []; })
+    .then(function (rows) {
+      var d = Array.isArray(rows) ? rows[0] : null;
+      if (!d) { show('bad'); return; }
+
+      $('shop').textContent = d.shop_name || 'ร้านค้า';
+      $('total').textContent = baht(d.total_amount);
+      $('items').textContent = d.item_count ? d.item_count + ' รายการ' : '';
+      try {
+        $('when').textContent = new Date(d.issued_at).toLocaleString('th-TH', {
+          dateStyle: 'medium', timeStyle: 'short'
+        });
+      } catch (e) { $('when').textContent = ''; }
+
+      show('ok');
+    })
+    .catch(function () {
+      // เน็ตลูกค้าล่ม — ยังต้องให้เขาไปโหลดแอปได้ ไม่ใช่จอว่าง
+      $('shop').textContent = 'ใบเสร็จจากร้านค้า';
+      $('when').textContent = '';
+      $('total').textContent = '—';
+      show('ok');
+    });
+
+  $('cta').addEventListener('click', function (e) {
+    e.preventDefault();
+    // ยิง store click ก่อน แต่ไม่รอ — keepalive ทำให้ request รอดแม้หน้าถูกปิด
+    try {
+      rpc('record_store_click', { p_token: token });
+    } catch (err) { /* ไม่ให้ขวางการไปสโตร์ */ }
+    location.href = storeUrl();
+  });
+
+  $('open-app').addEventListener('click', function (e) {
+    e.preventDefault();
+    // ถ้ามีแอปอยู่ deep link จะจับได้ ถ้าไม่มี หน้าจะอยู่เฉยๆ แล้วค่อยเด้งไปสโตร์
+    var t = setTimeout(function () { location.href = storeUrl(); }, 1500);
+    window.addEventListener('pagehide', function () { clearTimeout(t); }, { once: true });
+    location.href = (CFG.deepLinkScheme || 'moneyma') + '://r/' + token;
+  });
+})();
+</script>
+</body>
+</html>

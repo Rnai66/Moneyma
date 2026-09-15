@@ -9,6 +9,7 @@ import UpgradeModal from '../components/UpgradeModal';
 import { Capacitor } from '@capacitor/core';
 import { NATIVE_BILLING_READY } from '../config/billing';
 import { PLANS } from '../SubscriptionContext/SubscriptionService';
+import { markDeleted } from '../services/deletedTransactions';
 
 /** See App.js — no purchase CTAs on native until Play Billing is live. */
 const CAN_SELL = !Capacitor.isNativePlatform() || NATIVE_BILLING_READY;
@@ -179,11 +180,25 @@ function Transactions({ transactions, onRefresh, t, storageMode }) {
       try {
         setLoading(true);
         setMessage('');
-        if (storageMode === 'cloud' && user) {
-          await SupabaseService.deleteTransaction(user.id, id);
-        } else {
-          writeWebTransactions(readWebTransactions().filter(tx => tx.id !== id));
+        /**
+         * 🔴 ต้องบันทึก tombstone ก่อนเสมอ ไม่ว่าจะโหมดไหน
+         * โหมดเริ่มต้นคือ `local` และเดิมเส้นนี้ลบแค่ localStorage
+         * รอบ sync ถัดไป syncFromCloud ดึงแถวเดิมกลับลงมา แล้ว merge ใส่คืน
+         * = ผู้ใช้ลบแล้วรายการกลับมาเอง (และคลาวด์ก็ไม่เคยว่างสักที)
+         * ทะเบียนนี้ทำให้ทั้ง merge และรอบ sync ถัดไปรู้ว่าอย่าเอากลับมา
+         */
+        markDeleted(id);
+
+        // เอาออกจากเครื่องเสมอ — ในโหมด cloud ชุดนี้คือแคชที่ใช้ sync
+        writeWebTransactions(readWebTransactions().filter(tx => tx.id !== id));
+
+        // ลบบนคลาวด์ทันทีถ้าล็อกอินอยู่ · พลาดได้ ไม่เป็นไร
+        // tombstone จะเก็บงานค้างไว้ให้รอบ sync ถัดไปจัดการต่อ
+        if (user) {
+          const { error } = await SupabaseService.deleteTransaction(user.id, id);
+          if (error) console.warn('[delete] ลบบนคลาวด์ไม่สำเร็จ รอบ sync ถัดไปจะลองใหม่:', error.message || error);
         }
+
         await onRefresh();
         setStatus('success', t.deleteSuccess);
       } catch (e) {
