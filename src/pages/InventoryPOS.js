@@ -11,6 +11,7 @@ import AIConsentService from '../services/AIConsentService';
 import AIConsentModal from '../components/AIConsentModal';
 import { qrSvgDataUrl } from '../utils/qrGen';
 import { issueShareToken, buildReceiptUrl, recordReceipt, syncPendingReceipts } from '../services/ReceiptLoopService';
+import { peekDocNo, commitDocNo } from '../utils/docNumber';
 import * as BtPrinter from '../services/BluetoothPrinter';
 import { renderSlipToCanvas, renderTestSlipToCanvas } from '../utils/thermalRender';
 import { buildReceiptJob } from '../utils/escpos';
@@ -559,7 +560,8 @@ export default function InventoryPOS({ userPlan = 'free', onAddTransaction, open
   // แล้ว scan ที่เข้ามาจะจับคู่กับใบเสร็จไม่ได้เลย
   const buildSaleDoc = (kind, token = kind === 'receipt' ? issueShareToken() : null) => ({
     kind,
-    docNo: kind === 'so' ? `SO-${Date.now().toString().slice(-6)}` : `RC-${Date.now().toString().slice(-6)}`,
+    // peek เท่านั้น ยังไม่กินเลข — กินตอน commit เพื่อไม่ให้เลขขาดตอนถ้ากดยกเลิก
+    docNo: peekDocNo(kind === 'so' ? 'SO' : 'RC'),
     dateText: new Date().toLocaleString('th-TH'),
     dateIso: new Date().toISOString().split('T')[0],
     customerName,
@@ -624,6 +626,8 @@ export default function InventoryPOS({ userPlan = 'free', onAddTransaction, open
       shareUrl: doc.shareUrl,
     });
 
+    commitDocNo(doc.docNo);
+
     // ขาบันทึกของ growth loop — fire-and-forget โดยเจตนา
     // ห้าม await ตรงนี้ ถ้า Supabase ช้า การขายต้องไม่ค้างตาม
     if (doc.shareToken) {
@@ -657,6 +661,7 @@ export default function InventoryPOS({ userPlan = 'free', onAddTransaction, open
       return;
     }
     const doc = buildSaleDoc('so');
+    commitDocNo(doc.docNo);
     saveDocHistory('moneyma_so_history', {
       id: doc.docNo,
       docType: 'so',
@@ -675,15 +680,27 @@ export default function InventoryPOS({ userPlan = 'free', onAddTransaction, open
     setPrintDoc(doc);
   };
 
+  const whLabelOf = (wh) =>
+    wh === 'warehouse2' ? 'คลัง 2 (หน้าร้าน)' : wh === 'warehouse3' ? 'คลัง 3 (สำรอง)' : 'คลัง 1 (คลังหลัก)';
+
+  // 🔴 ใบสั่งซื้อร่างหนึ่งใบต้องได้เลขเดียว ไม่ว่าจะพิมพ์ เซฟรูป หรือกดรับเข้าสต็อก
+  //    เดิมสามทางนี้เรียกสูตรสร้างเลขแยกกัน PO ใบเดียวจึงได้สามเลขไม่ตรงกัน
+  //    ใช้ ref ไม่ใช่ state เพราะต้องได้ค่าทันทีในจังหวะที่กดปุ่ม
+  const poDocNoRef = useRef(null);
+  const ensurePoDocNo = () => {
+    if (!poDocNoRef.current) poDocNoRef.current = peekDocNo('PO');
+    return poDocNoRef.current;
+  };
+
   const handlePrintPo = () => {
     if (poItems.length === 0) {
       alert('⚠️ กรุณาเลือกสินค้าในใบสั่งซื้อก่อนออกเอกสาร!');
       return;
     }
-    const whLabel = poTargetWarehouse === 'warehouse2' ? 'คลัง 2 (หน้าร้าน)' : poTargetWarehouse === 'warehouse3' ? 'คลัง 3 (สำรอง)' : 'คลัง 1 (คลังหลัก)';
+    const whLabel = whLabelOf(poTargetWarehouse);
     setPrintDoc({
       kind: 'po',
-      docNo: `PO-${Date.now().toString().slice(-6)}`,
+      docNo: ensurePoDocNo(),
       dateText: new Date().toLocaleString('th-TH'),
       supplierName,
       supplierTaxId,
@@ -809,8 +826,8 @@ export default function InventoryPOS({ userPlan = 'free', onAddTransaction, open
       alert('⚠️ กรุณาเลือกสินค้าในใบสั่งซื้อก่อนออกเอกสารรูปภาพ!');
       return;
     }
-    const orderNo = `PO-${Date.now().toString().slice(-6)}`;
-    const whLabel = poTargetWarehouse === 'warehouse2' ? 'คลัง 2 (หน้าร้าน)' : poTargetWarehouse === 'warehouse3' ? 'คลัง 3 (สำรอง)' : 'คลัง 1 (คลังหลัก)';
+    const orderNo = ensurePoDocNo();
+    const whLabel = whLabelOf(poTargetWarehouse);
     const dataUrl = await generateDocumentJpgDataUrl({
       type: 'po',
       orderNo,
@@ -853,10 +870,29 @@ export default function InventoryPOS({ userPlan = 'free', onAddTransaction, open
 
   const subtotalPo = poItems.reduce((acc, item) => acc + (item.purchaseCost * item.qty), 0);
 
-  const handleCompletePO = () => {
+  // เปิดพรีวิวก่อน — ยังไม่เพิ่มสต็อก ยังไม่บันทึกรายจ่าย
+  const openPoPreview = () => {
+    if (poItems.length === 0) return;
+    setPrintDoc({
+      kind: 'po',
+      docNo: ensurePoDocNo(),
+      dateText: new Date().toLocaleString('th-TH'),
+      supplierName,
+      supplierTaxId,
+      warehouseLabel: whLabelOf(poTargetWarehouse),
+      items: poItems.map(it => ({ id: it.id, sku: it.sku, name: it.name, qty: it.qty, purchaseCost: it.purchaseCost })),
+      subtotal: subtotalPo,
+      total: subtotalPo,
+      committed: false,
+    });
+  };
+
+  // ยืนยันแล้วค่อยเพิ่มสต็อก + บันทึกรายจ่าย + ลงทะเบียนเอกสาร
+  const commitPO = () => {
     if (poItems.length === 0) return;
 
-    const whLabel = poTargetWarehouse === 'warehouse2' ? 'คลัง 2 (หน้าร้าน)' : poTargetWarehouse === 'warehouse3' ? 'คลัง 3 (สำรอง)' : 'คลัง 1 (คลังหลัก)';
+    const docNo = (printDoc && printDoc.docNo) || ensurePoDocNo();
+    const whLabel = whLabelOf(poTargetWarehouse);
 
     setProducts(prev => {
       let updated = prev.map(prod => {
@@ -921,7 +957,7 @@ export default function InventoryPOS({ userPlan = 'free', onAddTransaction, open
 
     // บันทึกใบ PO ลงทะเบียนเอกสาร
     saveDocHistory('moneyma_po_history', {
-      id: `PO-${Date.now().toString().slice(-6)}`,
+      id: docNo,
       docType: 'po',
       date: new Date().toISOString().split('T')[0],
       dateText: new Date().toLocaleString('th-TH'),
@@ -944,8 +980,12 @@ export default function InventoryPOS({ userPlan = 'free', onAddTransaction, open
       });
     }
 
-    alert(`🎉 บันทึกใบสั่งซื้อ PO เข้า [${whLabel}] เพิ่มเข้าคลัง และสร้างบันทึกรายจ่ายสำเร็จ!`);
+    // กินเลขตอนนี้เท่านั้น — ใบร่างที่เปิดดูแล้วยกเลิกจะไม่ทำให้เลขขาดตอน
+    commitDocNo(docNo);
+    poDocNoRef.current = null;
+
     setPoItems([]);
+    setPrintDoc(prev => (prev && prev.kind === 'po' ? { ...prev, committed: true, poReceived: true } : prev));
   };
 
   const buildReportPayload = () => {
@@ -1633,14 +1673,19 @@ export default function InventoryPOS({ userPlan = 'free', onAddTransaction, open
                   <div key={item.id} className="pos-cart-item">
                     <div className="pos-cart-info">
                       <strong>{item.name}</strong>
-                      <div style={{ display: 'flex', gap: '4px', alignItems: 'center', marginTop: '4px' }}>
-                        <span>{t.poUnitCost || 'ทุนซื้อ: ฿'}</span>
-                        <input
-                          type="number"
-                          style={{ width: '60px' }}
-                          value={item.purchaseCost}
-                          onChange={e => updatePoCost(item.id, e.target.value)}
-                        />
+                      <div className="mm-po-cost">
+                        <span className="mm-po-cost-label">{t.poUnitCostLabel || 'ทุนซื้อ'}</span>
+                        <div className="mm-po-cost-field">
+                          <span className="mm-po-cost-cur">฿</span>
+                          <input
+                            type="number"
+                            inputMode="decimal"
+                            min="0"
+                            step="0.01"
+                            value={item.purchaseCost}
+                            onChange={e => updatePoCost(item.id, e.target.value)}
+                          />
+                        </div>
                       </div>
                     </div>
                     <div className="pos-cart-qty-ctrl">
@@ -1649,7 +1694,7 @@ export default function InventoryPOS({ userPlan = 'free', onAddTransaction, open
                       <button onClick={() => updatePoQty(item.id, item.qty + 1)}>+</button>
                     </div>
                     <div className="pos-cart-item-total">
-                      ฿{(item.purchaseCost * item.qty).toLocaleString()}
+                      ฿{(Number(item.purchaseCost) * Number(item.qty) || 0).toLocaleString('th-TH', { maximumFractionDigits: 2 })}
                     </div>
                   </div>
                 ))
@@ -1659,7 +1704,7 @@ export default function InventoryPOS({ userPlan = 'free', onAddTransaction, open
             <div className="pos-cart-summary">
               <div className="pos-sum-row total">
                 <span>{t.poTotalExpense || 'ยอดสั่งซื้อรวม (Expense):'}</span>
-                <span className="pos-grand-total" style={{ color: 'var(--color-danger)' }}>฿{subtotalPo.toLocaleString()}</span>
+                <span className="pos-grand-total" style={{ color: 'var(--color-danger)' }}>฿{subtotalPo.toLocaleString('th-TH', { maximumFractionDigits: 2 })}</span>
               </div>
 
               <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
@@ -1667,7 +1712,7 @@ export default function InventoryPOS({ userPlan = 'free', onAddTransaction, open
                   className="pos-checkout-btn"
                   style={{ background: 'linear-gradient(135deg, #6366f1 0%, #4338ca 100%)', flex: 1 }}
                   disabled={poItems.length === 0}
-                  onClick={handleCompletePO}
+                  onClick={openPoPreview}
                 >
                   {t.completePoBtn || '📥 รับสินค้าเข้าสต็อก & บันทึกรายจ่าย'}
                 </button>
@@ -2163,6 +2208,16 @@ export default function InventoryPOS({ userPlan = 'free', onAddTransaction, open
                 ✅ บันทึกการขายเรียบร้อย ตัดสต็อกและบันทึกรายรับแล้ว
               </div>
             )}
+            {printDoc.kind === 'po' && !printDoc.committed && (
+              <div className="mm-print-warn no-print">
+                ⚠️ ยังไม่รับเข้าสต็อก — ตรวจรายการและทุนซื้อให้ครบก่อนกดยืนยัน ระบบจะเพิ่มสต็อกและบันทึกรายจ่ายเมื่อกดยืนยันเท่านั้น
+              </div>
+            )}
+            {printDoc.kind === 'po' && printDoc.poReceived && (
+              <div className="mm-print-ok no-print">
+                ✅ รับเข้า{printDoc.warehouseLabel || 'คลัง'}เรียบร้อย เพิ่มสต็อกและบันทึกรายจ่ายแล้ว
+              </div>
+            )}
 
             <div className="mm-print-scroll">
               <div id="moneyma-print-area">
@@ -2171,7 +2226,14 @@ export default function InventoryPOS({ userPlan = 'free', onAddTransaction, open
             </div>
 
             <div className="mm-print-actions no-print">
-              {printDoc.kind === 'receipt' && !printDoc.committed ? (
+              {printDoc.kind === 'po' && !printDoc.committed ? (
+                <>
+                  <button className="mm-btn mm-btn-ghost" onClick={() => setPrintDoc(null)}>ยกเลิก</button>
+                  <button className="mm-btn mm-btn-primary" onClick={commitPO}>
+                    📥 ยืนยันรับเข้าสต็อก
+                  </button>
+                </>
+              ) : printDoc.kind === 'receipt' && !printDoc.committed ? (
                 <>
                   <button className="mm-btn mm-btn-ghost" onClick={() => setPrintDoc(null)}>ยกเลิก</button>
                   {/* ปุ่มหลักทำตามสวิตช์ "พิมพ์อัตโนมัติ" บนแถบเครื่องพิมพ์ */}

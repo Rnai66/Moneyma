@@ -1762,3 +1762,69 @@
 .mm-bt-note strong {
   color: var(--color-text-primary, #0f172a);
 }
+
+/* ── ช่องทุนซื้อในใบสั่งซื้อ (PO) ──────────────────────────────
+   เดิมเป็น <span>ทุนซื้อ: ฿</span> + <input width:60px> ติดกัน
+   ปัญหาที่เกิด: สัญลักษณ์ ฿ ลอยอยู่นอกกรอบจนดูเหมือนส่วนหนึ่งของตัวเลข
+   และลูกศรเพิ่ม-ลดของ input[type=number] กินความกว้างไปราว 20px
+   เหลือที่ให้ตัวเลขแค่ 2 หลัก เลข 3 หลักขึ้นไปจึงถูกบีบจนอ่านผิด */
+.mm-po-cost {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+.mm-po-cost-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-secondary, #64748b);
+  white-space: nowrap;
+}
+.mm-po-cost-field {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 8px;
+  border: 1px solid var(--color-border-strong, #cbd5e1);
+  border-radius: 10px;
+  background: var(--bg-modal-solid, #ffffff);
+}
+.mm-po-cost-field:focus-within {
+  border-color: var(--btn-accent, #4a5ed9);
+}
+.mm-po-cost-cur {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-secondary, #64748b);
+}
+.mm-po-cost input {
+  width: 84px;
+  padding: 4px 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  text-align: right;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-text-primary, #0f172a);
+  /* ตัวเลขความกว้างเท่ากันทุกตัว ไม่งั้นเลขขยับซ้ายขวาตอนพิมพ์ */
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+}
+/* ซ่อนลูกศรเพิ่ม-ลด — คืนความกว้างให้ตัวเลข */
+.mm-po-cost input::-webkit-outer-spin-button,
+.mm-po-cost input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.mm-po-cost input[type='number'] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+/* ยอดเงินท้ายแถวและยอดรวม — ตัวเลขความกว้างเท่ากันเช่นกัน */
+.pos-cart-item-total,
+.pos-grand-total {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+}

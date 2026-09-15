@@ -636,6 +636,7 @@ export const th = {
     poSupplierPlaceholder: 'ชื่อผู้จัดจำหน่าย / ซัพพลายเออร์',
     poSupplierTaxIdPlaceholder: 'เลขผู้เสียภาษี ซัพพลายเออร์',
     poUnitCost: 'ทุนซื้อ: ฿',
+    poUnitCostLabel: 'ทุนซื้อ',
     poTotalExpense: 'ยอดสั่งซื้อรวม (Expense):',
     completePoBtn: '📥 รับสินค้าเข้าสต็อก & บันทึกรายจ่าย',
     prodModalMinStock: 'เตือนเมื่อเหลือ',

@@ -634,6 +634,7 @@ export const en = {
     poSupplierPlaceholder: 'Supplier / Vendor Name',
     poSupplierTaxIdPlaceholder: 'Supplier Tax ID',
     poUnitCost: 'Unit Cost: ฿',
+    poUnitCostLabel: 'Unit cost',
     poTotalExpense: 'Total Purchase (Expense):',
     completePoBtn: '📥 Receive Goods & Record Expense',
     prodModalMinStock: 'Alert below',
